@@ -25,9 +25,11 @@ Copia `.env.example` y configura las variables via `--dart-define`:
 
 ```bash
 flutter run \
-  --dart-define=API_URL=http://localhost:3001 \
+  --dart-define=API_URL=http://10.0.2.2:3001 \
   --dart-define=STRIPE_PUBLIC_KEY=pk_test_tu_clave
 ```
+
+> Si usas Docker en Windows/macOS, para Android emulado la ruta correcta es `http://10.0.2.2:3001`; para iOS Simulator o desktop suele ser `http://localhost:3001`; para un dispositivo físico usa la IP del host del equipo.
 
 ## Ejecutar
 
