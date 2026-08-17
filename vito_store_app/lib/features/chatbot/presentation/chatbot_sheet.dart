@@ -41,27 +41,6 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
     _messages.add(ChatMessage.bot(
       'Hola, soy el Asistente VITO. En que puedo ayudarte hoy?',
     ));
-    // Conectar y escuchar mensajes entrantes.
-    final service = ref.read(chatbotServiceProvider);
-    service.connect();
-    service.messageStream.listen(_onIncoming);
-  }
-
-  void _onIncoming(ChatMessage msg) {
-    if (!mounted) return;
-    setState(() {
-      if (msg.isTyping) {
-        _isTyping = true;
-      } else {
-        _isTyping = false;
-        // Reemplazar el ultimo mensaje "typing" si existe.
-        if (_messages.isNotEmpty && _messages.last.isTyping) {
-          _messages.removeLast();
-        }
-        _messages.add(msg);
-      }
-    });
-    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -76,22 +55,43 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
     });
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _inputController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isTyping) return;
     final service = ref.read(chatbotServiceProvider);
     setState(() {
       _messages.add(ChatMessage.user(text));
       _isTyping = true;
-      _messages.add(ChatMessage.bot('...', isTyping: true));
     });
     _inputController.clear();
     _scrollToBottom();
-    service.sendMessage(text);
+
+    try {
+      final answer = await service.ask(
+        message: text,
+        history: List<ChatMessage>.from(_messages),
+      );
+      if (!mounted) return;
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage.bot(answer));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isTyping = false;
+        _messages.add(ChatMessage.bot(
+          'No pude conectar con el asistente. Verifica tu conexion e intenta de nuevo.',
+        ));
+      });
+    }
+    _scrollToBottom();
   }
 
   @override
   void dispose() {
+    // Al cerrar el chat, resetear la sesión del asistente (best-effort).
+    ref.read(chatbotServiceProvider).resetSession();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();

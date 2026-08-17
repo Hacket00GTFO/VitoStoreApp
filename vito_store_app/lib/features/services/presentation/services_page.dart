@@ -49,17 +49,21 @@ class ServicesPage extends ConsumerWidget {
         emptyAction: () => ref.invalidate(servicesListProvider),
         onRetry: () => ref.invalidate(servicesListProvider),
         builder: (services) {
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: services.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final Service s = services[index];
-              return _ServiceCard(
-                service: s,
-                icon: _iconFor(s.icon),
-              );
-            },
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(servicesListProvider),
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: services.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final Service s = services[index];
+                return _ServiceCard(
+                  service: s,
+                  icon: _iconFor(s.icon),
+                );
+              },
+            ),
           );
         },
       ),

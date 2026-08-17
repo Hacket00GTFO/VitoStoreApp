@@ -1,111 +1,98 @@
-import 'dart:async';
+import 'dart:math';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// ignore: library_prefixes, conventional prefix for socket_io_client
-import 'package:socket_io_client/socket_io_client.dart' as IO;
 
-import '../../../config/env.dart';
+import '../../../config/api_config.dart';
+import '../../../shared/providers/providers.dart';
 import '../domain/chat_message.dart';
 
-/// Servicio del chatbot via Socket.IO.
-/// Se conecta al backend (Env.apiBaseUrl) y expone un stream de mensajes
-/// entrantes del asistente VITO.
+/// Servicio del chatbot "Asistente VITO".
+///
+/// Consume el endpoint REST del backend (el mismo que usa el widget web):
+/// `POST /api/chatbot/assistant/public-query` (requiere sesión activa).
+/// Mantiene un `sessionId` estable mientras la app está viva para darle
+/// contexto conversacional al asistente.
 class ChatbotService {
-  ChatbotService() {
-    _initSocket();
+  ChatbotService(this._dio);
+
+  final Dio _dio;
+  String? _sessionId;
+
+  /// Session id de la conversación actual (se genera bajo demanda).
+  String get sessionId => _sessionId ??= _generateSessionId();
+
+  static String _generateSessionId() {
+    final rnd = Random.secure();
+    final ts = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    final rand =
+        List.generate(10, (_) => rnd.nextInt(36).toRadixString(36)).join();
+    return 'app-$ts-$rand';
   }
 
-  late final IO.Socket _socket;
-  final _controller = StreamController<ChatMessage>.broadcast();
-  bool _connected = false;
+  /// Envía un mensaje al asistente y devuelve su respuesta en texto.
+  ///
+  /// [history] son los últimos mensajes visibles en la UI (sin los de
+  /// "escribiendo..."), en orden cronológico; se envían los últimos 10.
+  Future<String> ask({
+    required String message,
+    required List<ChatMessage> history,
+  }) async {
+    final historyPayload = history
+        .where((m) => !m.isTyping && m.text.trim().isNotEmpty)
+        .toList()
+        .reversed
+        .take(10)
+        .toList()
+        .reversed
+        .map((m) => {
+              'role': m.isUser ? 'user' : 'assistant',
+              'content': m.text,
+            })
+        .toList();
 
-  /// Stream de mensajes entrantes del bot.
-  Stream<ChatMessage> get messageStream => _controller.stream;
-
-  /// Estado de conexion.
-  bool get isConnected => _connected;
-
-  void _initSocket() {
-    // La URL base del backend (sin /api). Socket.IO se sirve en el mismo host.
-    final base = Env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
-    _socket = IO.io(
-      base,
-      IO.OptionBuilder()
-          .setTransports(['websocket'])
-          .disableAutoConnect()
-          .enableForceNewConnection()
-          .build(),
+    final resp = await _dio.post(
+      ApiEndpoints.chatbotAssistantQuery,
+      data: {
+        'message': message,
+        'explicitMessage': message,
+        'rawMessage': message,
+        'sessionId': sessionId,
+        'pageContext': '/app',
+        'history': historyPayload,
+      },
     );
 
-    _socket.onConnect((_) {
-      _connected = true;
-    });
-
-    _socket.onDisconnect((_) {
-      _connected = false;
-    });
-
-    _socket.onConnectError((_) {
-      _connected = false;
-    });
-
-    // Evento de respuesta del bot.
-    _socket.on('bot_message', (data) {
-      final text = _extractText(data);
-      if (text.isNotEmpty) {
-        _controller.add(ChatMessage.bot(text));
-      }
-    });
-
-    // Indicador de "escribiendo...".
-    _socket.on('typing', (data) {
-      _controller.add(ChatMessage.bot('...', isTyping: true));
-    });
-  }
-
-  String _extractText(dynamic data) {
-    if (data is String) return data;
-    if (data is Map) {
-      return (data['message']?.toString() ??
-          data['text']?.toString() ??
-          data['response']?.toString() ??
-          '');
+    final data = resp.data;
+    final payload = data is Map<String, dynamic>
+        ? (data['data'] is Map<String, dynamic>
+            ? data['data'] as Map<String, dynamic>
+            : data)
+        : <String, dynamic>{};
+    final answer = payload['answer']?.toString();
+    if (answer == null || answer.trim().isEmpty) {
+      return 'No pude responder esa pregunta en este momento. Intenta de nuevo.';
     }
-    return '';
+    return answer;
   }
 
-  /// Conecta el socket (si no esta conectado).
-  void connect() {
-    if (!_socket.connected) {
-      _socket.connect();
+  /// Resetea la sesión del asistente en el servidor (best-effort) y genera
+  /// una nueva para la próxima conversación.
+  Future<void> resetSession() async {
+    final previous = _sessionId;
+    _sessionId = null;
+    if (previous == null) return;
+    try {
+      await _dio
+          .post(ApiEndpoints.chatbotAssistantReset, data: {'sessionId': previous})
+          .timeout(const Duration(seconds: 4));
+    } catch (_) {
+      // Best-effort: no bloquear la UI si falla el reset.
     }
-  }
-
-  /// Desconecta el socket.
-  void disconnect() {
-    if (_socket.connected) {
-      _socket.disconnect();
-    }
-  }
-
-  /// Envia un mensaje de texto al backend.
-  void sendMessage(String text) {
-    if (text.trim().isEmpty) return;
-    connect();
-    _socket.emit('user_message', {'message': text.trim()});
-  }
-
-  /// Libera recursos.
-  void dispose() {
-    disconnect();
-    _controller.close();
-    _socket.dispose();
   }
 }
 
 /// Provider del [ChatbotService].
 final chatbotServiceProvider = Provider<ChatbotService>((ref) {
-  final service = ChatbotService();
-  ref.onDispose(service.dispose);
-  return service;
+  return ChatbotService(ref.read(dioProvider));
 });

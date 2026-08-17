@@ -38,9 +38,12 @@ class FavoritesPage extends ConsumerWidget {
         emptyAction: () => context.push('/tienda'),
         onRetry: () => ref.invalidate(favoriteProductsProvider),
         builder: (products) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(favoriteProductsProvider),
+            child: GridView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
@@ -72,6 +75,7 @@ class FavoritesPage extends ConsumerWidget {
                 child: ProductCard(product: product),
               );
             },
+            ),
           );
         },
       ),

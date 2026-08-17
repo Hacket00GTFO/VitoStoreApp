@@ -39,17 +39,21 @@ class NotificationsPage extends ConsumerWidget {
         emptyMessage: 'No tienes notificaciones.',
         emptyIcon: LucideIcons.bellOff,
         onRetry: () => ref.invalidate(notificationsProvider),
-        builder: (notifications) => ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: notifications.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final notification = notifications[index];
-            return _NotificationTile(
-              notification: notification,
-              onTap: () => _markAsRead(context, ref, notification),
-            );
-          },
+        builder: (notifications) => RefreshIndicator(
+          onRefresh: () async => ref.invalidate(notificationsProvider),
+          child: ListView.separated(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: notifications.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+              return _NotificationTile(
+                notification: notification,
+                onTap: () => _markAsRead(context, ref, notification),
+              );
+            },
+          ),
         ),
       ),
     );

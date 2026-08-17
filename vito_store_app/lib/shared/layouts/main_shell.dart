@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../features/chatbot/presentation/chatbot_sheet.dart';
+
 /// Shell principal con bottom navigation (Inicio · Tienda · Cuenta · Favoritos)
 /// y FAB global del chatbot.
 ///
@@ -36,12 +38,7 @@ class MainShell extends StatelessWidget {
     return Scaffold(
       body: child,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO(Fase 7): abrir chatbot bottom sheet (Socket.IO).
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chatbot — disponible en Fase 7')),
-          );
-        },
+        onPressed: () => ChatbotSheet.show(context),
         tooltip: 'Asistente VITO',
         child: const Icon(LucideIcons.messageCircle),
       ),

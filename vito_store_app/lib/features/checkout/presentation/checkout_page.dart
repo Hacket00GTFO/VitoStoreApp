@@ -1,8 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../config/env.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../data/checkout_repository.dart';
@@ -199,23 +201,31 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   }
 
   Step _paymentStep(BuildContext context) {
+    // El backend solo tiene Stripe activo (`/api/payments/available`).
+    const enabledMethods = {PaymentMethod.stripe};
     return Step(
       title: const Text('Metodo de pago'),
       content: Column(
-        children: PaymentMethod.values.map((method) {
-          return ListTile(
-            leading: Icon(method.icon),
-            title: Text(method.label),
-            trailing: Radio<PaymentMethod>(
-              value: method,
-              // ignore: deprecated_member_use
-              groupValue: _paymentMethod,
-              // ignore: deprecated_member_use
-              onChanged: (v) => setState(() => _paymentMethod = v!),
-            ),
-            onTap: () => setState(() => _paymentMethod = method),
-          );
-        }).toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...PaymentMethod.values.map((method) {
+            final enabled = enabledMethods.contains(method);
+            return ListTile(
+              enabled: enabled,
+              leading: Icon(method.icon),
+              title: Text(method.label),
+              subtitle: enabled ? null : const Text('No disponible por el momento'),
+              trailing: Radio<PaymentMethod>(
+                value: method,
+                // ignore: deprecated_member_use
+                groupValue: _paymentMethod,
+                // ignore: deprecated_member_use
+                onChanged: enabled ? (v) => setState(() => _paymentMethod = v!) : null,
+              ),
+              onTap: enabled ? () => setState(() => _paymentMethod = method) : null,
+            );
+          }),
+        ],
       ),
       isActive: _currentStep >= 1,
       state: _currentStep > 1 ? StepState.complete : StepState.indexed,
@@ -338,9 +348,8 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
 
     try {
       final repo = ref.read(checkoutRepositoryProvider);
-      final cart = ref.read(cartControllerProvider);
 
-      // 1. Crear la orden.
+      // 1. Crear la orden (el backend vacía el carrito en el servidor).
       final order = await repo.createOrder(
         shippingAddress: {
           'fullName': _fullNameController.text.trim(),
@@ -352,27 +361,64 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
         },
         paymentMethod: _paymentMethod.name,
       );
+      final orderId = order['id']?.toString() ?? '';
+      final orderNumber =
+          order['orderNumber']?.toString() ?? orderId;
 
-      // 2. Si es Stripe, crear PaymentIntent.
-      if (_paymentMethod == PaymentMethod.stripe) {
-        await repo.getStripePaymentIntent(
-          orderId: order['id']?.toString() ?? '',
-          amount: cart.totalAmount,
+      // 2. Stripe: crear PaymentIntent y presentar la hoja de pago.
+      //    Sin publishable key configurada, la orden queda PENDING y se
+      //    muestra exito con aviso de pago pendiente.
+      if (_paymentMethod == PaymentMethod.stripe &&
+          Env.stripePublicKey.isNotEmpty &&
+          orderId.isNotEmpty) {
+        final clientSecret = await repo.getStripePaymentIntent(orderId: orderId);
+        if (clientSecret.isEmpty) {
+          throw Exception('No se pudo iniciar el pago con Stripe');
+        }
+        await stripe.Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: stripe.SetupPaymentSheetParameters(
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: 'VITO Technologies',
+            style: ThemeMode.system,
+          ),
         );
+        try {
+          await stripe.Stripe.instance.presentPaymentSheet();
+        } on stripe.StripeException catch (e) {
+          // Usuario canceló la hoja de pago: la orden queda pendiente.
+          await _syncCart();
+          setState(() {
+            _isProcessing = false;
+            _error =
+                'Pago no completado. Tu orden $orderNumber quedo registrada como pendiente.';
+            if (e.error.code != stripe.FailureCode.Canceled) {
+              _error = 'Error en el pago: ${e.error.localizedMessage ?? e.error.message ?? e}';
+            }
+          });
+          return;
+        }
       }
 
-      // 3. Vaciar carrito y mostrar exito.
-      await ref.read(cartControllerProvider.notifier).clear();
+      // 3. Sincronizar carrito (el backend ya lo vació) y mostrar exito.
+      await _syncCart();
 
       setState(() {
         _isProcessing = false;
-        _orderNumber = order['orderNumber']?.toString() ?? order['id']?.toString() ?? '--';
+        _orderNumber = orderNumber.isNotEmpty ? orderNumber : '--';
       });
     } catch (e) {
       setState(() {
         _isProcessing = false;
         _error = e.toString();
       });
+    }
+  }
+
+  Future<void> _syncCart() async {
+    try {
+      await ref.read(cartControllerProvider.notifier).load();
+    } catch (_) {
+      // El carrito ya se vació en el servidor; un error de red aquí no es crítico.
     }
   }
 

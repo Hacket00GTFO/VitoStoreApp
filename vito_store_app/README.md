@@ -31,6 +31,62 @@ flutter run \
 
 > Si usas Docker en Windows/macOS, para Android emulado la ruta correcta es `http://10.0.2.2:3001`; para iOS Simulator o desktop suele ser `http://localhost:3001`; para un dispositivo físico usa la IP del host del equipo.
 
+## Acceso remoto (Cloudflare Tunnel)
+
+Para usar la app de forma remota (dispositivo físico fuera de tu red, demos, pruebas) sin exponer puertos ni configurar un dominio, el repo incluye un contenedor **Cloudflare Quick Tunnel** propio de VitoStoreApp que expone `vito-api:3001` por HTTPS.
+
+Requisito: el stack backend (`desingVITO/backend`) debe estar corriendo, ya que el túnel se une a su red Docker `backend_vito-network` como red externa.
+
+```bash
+# Desde la raíz del repo VitoStoreApp
+docker compose -f docker-compose.cloudflared.yml up -d
+```
+
+Obtén la URL pública generada:
+
+```powershell
+# Opción 1: script (muestra la URL y el comando flutter run listo)
+.\scripts\get-tunnel-url.ps1
+
+# Opción 2: manual, busca la línea https://*.trycloudflare.com
+docker logs vitostore-cloudflared
+```
+
+Corre la app apuntando al túnel:
+
+```bash
+flutter run --dart-define=API_URL=https://xxxx.trycloudflare.com
+```
+
+> **Importante (Quick Tunnel):** la URL `trycloudflare.com` es aleatoria y **cambia cada vez que el contenedor reinicia**. Tras un reinicio, vuelve a correr `get-tunnel-url.ps1` y recompila la app con la nueva URL. Para una URL fija se puede migrar a un Named Tunnel con token de Cloudflare Zero Trust.
+>
+> El nombre de la red externa (`backend_vito-network`) depende de la carpeta `backend` del proyecto desingVITO; si ese stack se levanta con otro nombre de proyecto (`docker compose -p ...`), ajusta el nombre de la red en `docker-compose.cloudflared.yml`.
+
+Para detener solo el túnel (sin afectar el backend):
+
+```bash
+docker compose -f docker-compose.cloudflared.yml down
+```
+
+### Generar APK con acceso remoto
+
+La URL del túnel se embebe en el APK en tiempo de compilación vía `--dart-define`, así que el APK funciona desde **cualquier dispositivo con internet**, sin configuración adicional:
+
+```bash
+# 1. Asegúrate de que el túnel esté corriendo y obtén la URL actual
+.\scripts\get-tunnel-url.ps1
+
+# 2. Compila el APK release con esa URL
+cd vito_store_app
+flutter build apk --release --dart-define=API_URL=https://xxxx.trycloudflare.com
+```
+
+El APK queda en `build/app/outputs/flutter-apk/app-release.apk`, listo para instalar en cualquier Android (`adb install` o copiándolo al dispositivo).
+
+> **Advertencia:** el APK queda ligado a la URL del túnel del momento del build. Si el contenedor `vitostore-cloudflared` reinicia, la URL cambia y el APK deja de conectar — habría que recompilar con la nueva URL. Para distribuir APKs sin recompilar, migra a un **Named Tunnel** (URL fija con tu dominio, requiere cuenta Cloudflare Zero Trust).
+>
+> El permiso `android.permission.INTERNET` ya está declarado en `android/app/src/main/AndroidManifest.xml`, por lo que el build release puede salir a internet sin cambios extra. Al ser HTTPS (túnel Cloudflare), no se requiere `usesCleartextTraffic`.
+
 ## Ejecutar
 
 ```bash

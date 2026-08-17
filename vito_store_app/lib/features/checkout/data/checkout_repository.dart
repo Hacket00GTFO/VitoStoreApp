@@ -26,30 +26,37 @@ class CheckoutRepository {
       if (notes != null) 'notes': notes,
     });
     final data = resp.data;
-    // El backend puede envolver en { data: {...} } o devolver directo.
+    // Contrato del backend: 201 { success, data: { order: {...} } }.
     if (data is Map<String, dynamic>) {
-      return data.containsKey('data') && data['data'] is Map
-          ? data['data'] as Map<String, dynamic>
-          : data;
+      final inner = data['data'];
+      if (inner is Map<String, dynamic> && inner['order'] is Map) {
+        return inner['order'] as Map<String, dynamic>;
+      }
+      if (inner is Map<String, dynamic>) return inner;
+      return data;
     }
     return <String, dynamic>{};
   }
 
   /// Crea un PaymentIntent de Stripe para la orden indicada.
   ///
+  /// Consume `POST /api/payments/stripe/create-intent` (el monto lo recalcula
+  /// el backend desde la orden, siempre en MXN).
   /// Devuelve el `clientSecret` necesario para confirmar el pago en el cliente.
   Future<String> getStripePaymentIntent({
     required String orderId,
-    required double amount,
   }) async {
-    final resp = await _dio.post(ApiEndpoints.payments.stripe, data: {
-      'orderId': orderId,
-      'amount': amount,
-    });
+    final resp = await _dio.post(
+      ApiEndpoints.payments.stripeCreateIntent,
+      data: {'orderId': orderId},
+    );
     final data = resp.data;
     if (data is Map<String, dynamic>) {
-      final clientSecret =
-          data['clientSecret'] ?? data['client_secret'] ?? data['paymentIntent'];
+      final inner = data['data'];
+      final source = inner is Map<String, dynamic> ? inner : data;
+      final clientSecret = source['clientSecret'] ??
+          source['client_secret'] ??
+          source['paymentIntent'];
       return clientSecret?.toString() ?? '';
     }
     return '';

@@ -88,6 +88,8 @@ class ApiEndpoints {
 
   // --- Chatbot ---
   static String get chatbot => '$base/chatbot';
+  static String get chatbotAssistantQuery => '$base/chatbot/assistant/public-query';
+  static String get chatbotAssistantReset => '$base/chatbot/assistant/reset';
 
   // --- Cotizaciones especializadas ---
   static String get specializedQuotes => '$base/specialized-quotes';
@@ -121,6 +123,9 @@ class _AuthEndpoints {
 class _PaymentEndpoints {
   const _PaymentEndpoints();
   String get stripe => '${ApiEndpoints.base}/payments/stripe';
+  String get stripeCreateIntent =>
+      '${ApiEndpoints.base}/payments/stripe/create-intent';
+  String get available => '${ApiEndpoints.base}/payments/available';
   String get mercadopago => '${ApiEndpoints.base}/payments/mercadopago';
   String get paypal => '${ApiEndpoints.base}/payments/paypal';
 }

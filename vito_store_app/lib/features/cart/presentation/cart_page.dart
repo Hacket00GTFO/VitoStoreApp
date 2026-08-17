@@ -7,9 +7,9 @@ import '../../../shared/widgets/state_view.dart';
 import 'cart_controller.dart';
 import '../domain/cart_item.dart';
 
-/// Formatea un precio en MXN.
-String _formatPrice(double amount) {
-  return '\$${amount.toStringAsFixed(2)} MXN';
+/// Formatea un precio con su divisa (MXN por defecto).
+String _formatPrice(double amount, [String currency = 'MXN']) {
+  return '\$${amount.toStringAsFixed(2)} $currency';
 }
 
 /// Pagina de carrito.
@@ -63,24 +63,28 @@ class CartPage extends ConsumerWidget {
     return Column(
       children: [
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: cart.items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              return _CartItemTile(
-                item: cart.items[index],
-                isUpdating: cart.isUpdating,
-                onIncrement: (item) => ref
-                    .read(cartControllerProvider.notifier)
-                    .updateQty(productId: item.productId, quantity: item.quantity + 1),
-                onDecrement: (item) => ref
-                    .read(cartControllerProvider.notifier)
-                    .updateQty(productId: item.productId, quantity: item.quantity - 1),
-                onRemove: (item) =>
-                    ref.read(cartControllerProvider.notifier).remove(item.productId),
-              );
-            },
+          child: RefreshIndicator(
+            onRefresh: () => ref.read(cartControllerProvider.notifier).load(),
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: cart.items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                return _CartItemTile(
+                  item: cart.items[index],
+                  isUpdating: cart.isUpdating,
+                  onIncrement: (item) => ref
+                      .read(cartControllerProvider.notifier)
+                      .updateQty(productId: item.productId, quantity: item.quantity + 1),
+                  onDecrement: (item) => ref
+                      .read(cartControllerProvider.notifier)
+                      .updateQty(productId: item.productId, quantity: item.quantity - 1),
+                  onRemove: (item) =>
+                      ref.read(cartControllerProvider.notifier).remove(item.productId),
+                );
+              },
+            ),
           ),
         ),
         _CartSummary(cart: cart),
@@ -174,7 +178,7 @@ class _CartItemTile extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   Text(
-                    _formatPrice(item.price),
+                    _formatPrice(item.price, item.currency),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -206,7 +210,7 @@ class _CartItemTile extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        _formatPrice(item.subtotal),
+                        _formatPrice(item.subtotal, item.currency),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -287,6 +291,15 @@ class _CartSummary extends StatelessWidget {
               _formatPrice(cart.totalAmount),
               isTotal: true,
             ),
+            if (cart.totals.subtotalUSD > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Incluye conversion USD→MXN @ ${cart.totals.exchangeRate}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

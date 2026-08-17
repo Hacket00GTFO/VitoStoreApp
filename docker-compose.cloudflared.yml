@@ -1,0 +1,19 @@
+# Cloudflare Quick Tunnel para VitoStoreApp
+# Expone vito-api:3001 a internet sin cuenta de Cloudflare.
+# La URL pública (https://*.trycloudflare.com) cambia en cada reinicio;
+# usa scripts/get-tunnel-url.ps1 para obtenerla.
+#
+# Requisito: el stack backend (desingVITO/backend) debe estar corriendo,
+# ya que este compose se une a su red como externa (no la crea ni la gestiona).
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.7.3
+    container_name: vitostore-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 --url http://vito-api:3001
+    networks:
+      - backend_vito-network
+
+networks:
+  backend_vito-network:
+    external: true
