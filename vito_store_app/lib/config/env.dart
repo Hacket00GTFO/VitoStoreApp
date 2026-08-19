@@ -29,6 +29,23 @@ class Env {
     return 'http://localhost:3001';
   }
 
+  /// Candidatos de URL del backend, en orden de preferencia, para el modo
+  /// híbrido (USB → IP LAN → túnel). Se inyectan con:
+  /// ```
+  /// flutter run --dart-define=API_URLS=http://localhost:3001,http://192.168.1.50:3001,https://xxx.trycloudflare.com
+  /// ```
+  /// Al arrancar, la app prueba `/api/health` en cada uno (en paralelo) y usa
+  /// el primero que responda. Si no se define, solo se usa [apiBaseUrl].
+  static List<String> get apiUrlCandidates {
+    const raw = String.fromEnvironment('API_URLS');
+    if (raw.trim().isEmpty) return [apiBaseUrl];
+    return raw
+        .split(',')
+        .map((e) => e.trim().replaceAll(RegExp(r'/+$'), ''))
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
   /// Clave pública de Stripe (pk_live_* o pk_test_*).
   static const String stripePublicKey = String.fromEnvironment(
     'STRIPE_PUBLIC_KEY',

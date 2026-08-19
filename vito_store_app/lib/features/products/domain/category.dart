@@ -1,3 +1,5 @@
+import '../../../core/network/image_url.dart';
+
 /// Modelo de categoria. Refleja el `Category` de Prisma.
 class Category {
   Category({
@@ -13,7 +15,8 @@ class Category {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       slug: json['slug']?.toString(),
-      icon: json['icon']?.toString(),
+      // Normalizar URL relativa de icono (/api/uploads/...) a absoluta.
+      icon: resolveImageUrl(json['icon']?.toString()),
       productCount: json['productCount'] as int? ?? json['_count']?['products'] as int?,
     );
   }

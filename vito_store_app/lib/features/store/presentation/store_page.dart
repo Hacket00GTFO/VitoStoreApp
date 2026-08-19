@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../shared/widgets/state_view.dart';
+import '../../cart/presentation/cart_controller.dart';
 import '../../products/data/category_repository.dart';
 import '../../products/domain/product.dart';
 import '../../products/presentation/product_card.dart';
@@ -52,6 +53,7 @@ class _StorePageState extends ConsumerState<StorePage> {
   Widget build(BuildContext context) {
     final catalog = ref.watch(storeCatalogProvider);
     final showLoading = catalog.initialLoading && catalog.error == null;
+    final cartCount = ref.watch(cartControllerProvider.select((c) => c.totalQuantity));
 
     return Scaffold(
       appBar: AppBar(
@@ -61,6 +63,15 @@ class _StorePageState extends ConsumerState<StorePage> {
             tooltip: 'Filtros',
             icon: const Icon(LucideIcons.slidersHorizontal),
             onPressed: _openFilters,
+          ),
+          IconButton(
+            tooltip: 'Carrito',
+            icon: Badge(
+              isLabelVisible: cartCount > 0,
+              label: Text('$cartCount'),
+              child: const Icon(LucideIcons.shoppingCart),
+            ),
+            onPressed: () => context.push('/carrito'),
           ),
           IconButton(
             tooltip: 'Favoritos',

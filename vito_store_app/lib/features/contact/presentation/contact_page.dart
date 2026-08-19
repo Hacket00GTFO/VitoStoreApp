@@ -6,8 +6,11 @@ import '../data/contact_repository.dart';
 
 /// Pagina de contacto.
 /// Formulario con validacion + datos de contacto y placeholder de mapa.
+/// Acepta [initialSubject] para prefijar el asunto (p.ej. desde Servicios).
 class ContactPage extends ConsumerStatefulWidget {
-  const ContactPage({super.key});
+  const ContactPage({this.initialSubject, super.key});
+
+  final String? initialSubject;
 
   @override
   ConsumerState<ContactPage> createState() => _ContactPageState();
@@ -22,6 +25,14 @@ class _ContactPageState extends ConsumerState<ContactPage> {
   final _messageController = TextEditingController();
 
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSubject != null && widget.initialSubject!.isNotEmpty) {
+      _subjectController.text = widget.initialSubject!;
+    }
+  }
 
   @override
   void dispose() {

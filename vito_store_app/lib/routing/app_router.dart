@@ -120,7 +120,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/checkout', builder: (context, state) => const CheckoutPage()),
       GoRoute(path: '/checkout/success', builder: (context, state) => const CheckoutPage(success: true)),
       GoRoute(path: '/blog', builder: (context, state) => const BlogPage()),
-      GoRoute(path: '/contacto', builder: (context, state) => const ContactPage()),
+      GoRoute(
+        path: '/contacto',
+        builder: (context, state) => ContactPage(
+          initialSubject: state.uri.queryParameters['subject'],
+        ),
+      ),
       GoRoute(path: '/notificaciones', builder: (context, state) => const NotificationsPage()),
       GoRoute(
         path: '/historial',

@@ -2,9 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../shared/widgets/state_view.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../../cart/presentation/cart_controller.dart';
 import '../../favorites/presentation/favorites_controller.dart';
 import '../data/product_repository.dart';
 import '../domain/product.dart';
@@ -71,7 +74,7 @@ class ProductDetailPage extends ConsumerWidget {
   }
 }
 
-class _DetailContent extends ConsumerWidget {
+class _DetailContent extends ConsumerStatefulWidget {
   const _DetailContent({
     required this.product,
     required this.heroTag,
@@ -83,9 +86,77 @@ class _DetailContent extends ConsumerWidget {
   final AsyncValue<List<Product>> relatedAsync;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DetailContent> createState() => _DetailContentState();
+}
+
+class _DetailContentState extends ConsumerState<_DetailContent> {
+  int _quantity = 1;
+  bool _added = false;
+
+  Product get product => widget.product;
+  String get heroTag => widget.heroTag;
+
+  Future<void> _addToCart() async {
+    final ref = this.ref;
+    final auth = ref.read(authControllerProvider);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Inicia sesion para agregar productos al carrito'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Iniciar sesion',
+            onPressed: () => context.push(
+              '/login?redirect=${Uri.encodeComponent('/productos/${product.categoryName ?? product.categoryId ?? 'producto'}/${product.id}')}',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    await ref.read(cartControllerProvider.notifier).addProduct(
+          productId: product.id,
+          quantity: _quantity,
+        );
+    if (!mounted) return;
+    // Verificar si hubo error en la operacion del carrito.
+    final cartState = ref.read(cartControllerProvider);
+    if (cartState.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al agregar al carrito: ${cartState.error}'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+    setState(() => _added = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_quantity == 1
+            ? '${product.name} agregado al carrito'
+            : '$_quantity x ${product.name} agregados al carrito'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Ver carrito',
+          onPressed: () => context.push('/carrito'),
+        ),
+      ),
+    );
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _added = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final favs = ref.watch(favoritesProvider);
     final isFav = favs.contains(product.id);
+    final cart = ref.watch(cartControllerProvider);
+    final outOfStock = product.stock != null && product.stock! <= 0;
 
     return CustomScrollView(
       slivers: [
@@ -172,24 +243,46 @@ class _DetailContent extends ConsumerWidget {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: product.stock != null && product.stock! <= 0
-                        ? null
-                        : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Agregado al carrito (Fase 5 implementara el carrito)'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                    icon: const Icon(LucideIcons.shoppingCart),
-                    label: const Text('Agregar al carrito'),
-                  ),
+                // Stepper de cantidad + boton agregar al carrito.
+                Row(
+                  children: [
+                    _QtyStepper(
+                      value: _quantity,
+                      minValue: 1,
+                      maxValue: (product.stock != null && product.stock! > 0)
+                          ? product.stock!
+                          : 99,
+                      onChanged: outOfStock
+                          ? null
+                          : (v) => setState(() => _quantity = v),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 48,
+                        child: FilledButton.icon(
+                          onPressed: outOfStock || cart.isUpdating
+                              ? null
+                              : _addToCart,
+                          icon: _added
+                              ? const Icon(LucideIcons.check)
+                              : (cart.isUpdating
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(LucideIcons.shoppingCart)),
+                          label: Text(_added
+                              ? 'Agregado'
+                              : (cart.isUpdating
+                                  ? 'Agregando...'
+                                  : 'Agregar al carrito')),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 Text('Productos relacionados',
@@ -199,7 +292,7 @@ class _DetailContent extends ConsumerWidget {
             ),
           ),
         ),
-        relatedAsync.when(
+        widget.relatedAsync.when(
           data: (related) => related.isEmpty
               ? const SliverToBoxAdapter(child: SizedBox.shrink())
               : SliverPadding(
@@ -275,21 +368,62 @@ class _ImageGalleryState extends State<_ImageGallery> {
             controller: _controller,
             itemCount: images.length,
             onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) => CachedNetworkImage(
-              imageUrl: images[i],
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: const Center(child: Icon(LucideIcons.imageOff, size: 48)),
+            itemBuilder: (context, i) => GestureDetector(
+              onTap: () => _openFullScreen(context, images, i),
+              child: CachedNetworkImage(
+                imageUrl: images[i],
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: const Center(child: Icon(LucideIcons.imageOff, size: 48)),
+                ),
               ),
             ),
           ),
         ),
-        if (images.length > 1)
+        // Indicador de zoom (toca para ampliar).
+        Positioned(
+          top: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.zoomIn, size: 14, color: Colors.white),
+                SizedBox(width: 4),
+                Text('Toca para ampliar',
+                    style: TextStyle(color: Colors.white, fontSize: 11)),
+              ],
+            ),
+          ),
+        ),
+        if (images.length > 1) ...[
+          // Contador de imagenes (i+1 / N).
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${_index + 1} / ${images.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          ),
+          // Dots indicator.
           Positioned(
             bottom: 12,
             left: 0,
@@ -313,7 +447,175 @@ class _ImageGalleryState extends State<_ImageGallery> {
               }),
             ),
           ),
+        ],
       ],
+    );
+  }
+
+  void _openFullScreen(BuildContext context, List<String> images, int initial) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (_, __, ___) => _FullScreenImageViewer(
+          images: images,
+          initialIndex: initial,
+        ),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+}
+
+/// Visor full-screen de imagenes con zoom/pan (InteractiveViewer) y swipe
+/// horizontal entre imagenes. Replica el lightbox del ProductDetailPage web.
+class _FullScreenImageViewer extends StatefulWidget {
+  const _FullScreenImageViewer({required this.images, required this.initialIndex});
+
+  final List<String> images;
+  final int initialIndex;
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late final PageController _controller;
+  late int _index;
+  final _transformationControllers = <int, TransformationController>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex.clamp(0, widget.images.length - 1);
+    _controller = PageController(initialPage: _index);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    for (final c in _transformationControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  TransformationController _controllerFor(int i) {
+    return _transformationControllers.putIfAbsent(i, TransformationController.new);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.images.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (context, i) => InteractiveViewer(
+              transformationController: _controllerFor(i),
+              minScale: 0.8,
+              maxScale: 4.0,
+              child: CachedNetworkImage(
+                imageUrl: widget.images[i],
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(LucideIcons.imageOff, size: 64, color: Colors.white54),
+                ),
+              ),
+            ),
+          ),
+          // Barra superior con cierre y contador.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 16, 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(LucideIcons.x, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    if (widget.images.length > 1)
+                      Text(
+                        '${_index + 1} / ${widget.images.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Stepper de cantidad (+/-) con valor minimo y maximo.
+/// Touch targets >=36dp (compacto para fila de accion de producto).
+class _QtyStepper extends StatelessWidget {
+  const _QtyStepper({
+    required this.value,
+    required this.minValue,
+    required this.maxValue,
+    required this.onChanged,
+  });
+
+  final int value;
+  final int minValue;
+  final int maxValue;
+  final ValueChanged<int>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final disabled = onChanged == null;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _btn(context, LucideIcons.minus, () => onChanged?.call((value - 1).clamp(minValue, maxValue)), disabled),
+          SizedBox(
+            width: 36,
+            child: Text(
+              '$value',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          _btn(context, LucideIcons.plus, () => onChanged?.call((value + 1).clamp(minValue, maxValue)), disabled),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(BuildContext context, IconData icon, VoidCallback? onTap, bool disabled) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Material(
+        color: Colors.transparent,
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: disabled ? null : onTap,
+          child: Icon(icon, size: 16),
+        ),
+      ),
     );
   }
 }

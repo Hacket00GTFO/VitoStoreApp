@@ -4,12 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../config/api_config.dart';
 import '../../../config/theme/app_colors.dart';
+import '../../cart/presentation/cart_controller.dart';
 import '../../products/data/category_repository.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/category.dart';
 import '../../products/domain/product.dart';
 import '../../products/presentation/product_card.dart';
+
+/// Notifier global de debug (temporal) para mostrar info de diagnostico.
+final _debugInfoNotifier = ValueNotifier<String>('Inicializando...');
 
 /// Home page completo.
 ///
@@ -46,6 +51,17 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final featuredAsync = ref.watch(featuredProductsProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
+    final cartCount = ref.watch(cartControllerProvider.select((c) => c.totalQuantity));
+
+    // DEBUG: actualizar info de diagnostico.
+    featuredAsync.whenData((products) {
+      final firstImg = products.isNotEmpty ? products.first.images.firstOrNull : null;
+      _debugInfoNotifier.value =
+          'baseUrl: ${ApiConfig.baseUrl}\n'
+          'resolvedBaseUrl: ${ApiConfig.resolvedBaseUrl ?? "(no resuelto)"}\n'
+          'productos: ${products.length}\n'
+          'primera imagen: $firstImg';
+    });
 
     return Scaffold(
       body: RefreshIndicator(
@@ -95,7 +111,11 @@ class HomePage extends ConsumerWidget {
             actions: [
               IconButton(
                 tooltip: 'Carrito',
-                icon: const Icon(LucideIcons.shoppingCart, color: Colors.white),
+                icon: Badge(
+                  isLabelVisible: cartCount > 0,
+                  label: Text('$cartCount'),
+                  child: const Icon(LucideIcons.shoppingCart, color: Colors.white),
+                ),
                 onPressed: () => context.push('/carrito'),
               ),
               IconButton(
@@ -106,6 +126,25 @@ class HomePage extends ConsumerWidget {
             ],
           ),
 
+          // DEBUG temporal: mostrar baseUrl y primera URL de imagen.
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber),
+              ),
+              child: ValueListenableBuilder<String>(
+                valueListenable: _debugInfoNotifier,
+                builder: (context, info, _) => Text(
+                  info,
+                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ),
           // Accesos rapidos
           SliverPadding(
             padding: const EdgeInsets.all(16),

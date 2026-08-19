@@ -1,3 +1,5 @@
+import '../../../core/network/image_url.dart';
+
 /// Modelo de post del blog.
 /// Refleja el recurso `/api/blog` del backend (mismo contrato que la web).
 class BlogPost {
@@ -22,9 +24,10 @@ class BlogPost {
       slug: json['slug']?.toString() ?? '',
       excerpt: json['excerpt']?.toString() ?? json['summary']?.toString(),
       content: json['content']?.toString(),
-      imageUrl: json['imageUrl']?.toString() ??
+      // Normalizar URL relativa (/api/uploads/...) a absoluta, como hace la web.
+      imageUrl: resolveImageUrl(json['imageUrl']?.toString() ??
           json['image']?.toString() ??
-          json['coverImage']?.toString(),
+          json['coverImage']?.toString()),
       author: author is Map
           ? (author['name']?.toString() ?? author['fullName']?.toString())
           : author?.toString(),

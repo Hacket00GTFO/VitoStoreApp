@@ -1,3 +1,5 @@
+import '../../../core/network/image_url.dart';
+
 /// Modelo de item del carrito.
 ///
 /// Refleja la estructura de un item en el carrito consumido via `/api/cart`:
@@ -35,12 +37,14 @@ class CartItem {
     }
 
     // Imagen: el producto puede traer `images` (array) o `imageUrl`.
+    // Normalizar URLs relativas (/api/uploads/...) a absolutas, como hace la web.
     String? imageUrl;
     final images = product?['images'];
     if (images is List && images.isNotEmpty) {
-      imageUrl = images.first?.toString();
+      imageUrl = resolveImageUrl(images.first?.toString());
     }
-    imageUrl ??= (json['imageUrl'] ?? product?['imageUrl'])?.toString();
+    imageUrl ??= resolveImageUrl(
+        (json['imageUrl'] ?? product?['imageUrl'])?.toString());
 
     return CartItem(
       productId:

@@ -1,3 +1,5 @@
+import '../../../core/network/image_url.dart';
+
 /// Modelo de producto. Refleja el `Product` de Prisma consumido via `/api/products`.
 class Product {
   Product({
@@ -19,11 +21,18 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
-    final images = <String>[];
+    final rawImages = <String>[];
     if (json['images'] is List) {
-      images.addAll((json['images'] as List).map((e) => e.toString()));
+      rawImages.addAll((json['images'] as List).map((e) => e.toString()));
     }
-    if (json['imageUrl'] != null) images.insert(0, json['imageUrl'].toString());
+    // Normalizar cada URL relativa (/api/uploads/...) a absoluta, como hace
+    // la web con `normalizeProductImageUrl` (data/products.ts).
+    final images = rawImages.map(resolveImageUrl).whereType<String>().toList();
+    final imageUrl = resolveImageUrl(json['imageUrl']?.toString());
+    // Evitar duplicar la imageUrl principal al frente de la lista.
+    if (imageUrl != null && !images.contains(imageUrl)) {
+      images.insert(0, imageUrl);
+    }
 
     return Product(
       id: json['id']?.toString() ?? '',
@@ -32,7 +41,7 @@ class Product {
       description: json['description']?.toString(),
       price: (json['price'] as num?)?.toDouble(),
       currency: json['currency']?.toString() ?? 'MXN',
-      imageUrl: json['imageUrl']?.toString(),
+      imageUrl: imageUrl,
       images: images,
       categoryId: json['categoryId']?.toString(),
       categoryName: json['categoryName']?.toString() ?? json['category']?['name']?.toString(),

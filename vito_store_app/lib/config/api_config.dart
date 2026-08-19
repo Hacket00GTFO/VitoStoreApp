@@ -7,9 +7,14 @@ import 'env.dart';
 class ApiConfig {
   ApiConfig._();
 
+  /// Base URL resuelta en runtime por el modo híbrido (ver `BaseUrlResolver`).
+  /// Si es null, se usa [Env.apiBaseUrl].
+  static String? resolvedBaseUrl;
+
   /// URL base normalizada a `.../api`.
   static String get baseUrl {
-    final trimmed = Env.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    final trimmed =
+        (resolvedBaseUrl ?? Env.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
     return trimmed.endsWith('/api') ? trimmed : '$trimmed/api';
   }
 

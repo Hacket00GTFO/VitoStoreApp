@@ -31,6 +31,49 @@ flutter run \
 
 > Si usas Docker en Windows/macOS, para Android emulado la ruta correcta es `http://10.0.2.2:3001`; para iOS Simulator o desktop suele ser `http://localhost:3001`; para un dispositivo físico usa la IP del host del equipo.
 
+## Conexión híbrida (USB + IP LAN + túnel, recomendado)
+
+La app puede compilarse con **varios candidatos de URL** y al arrancar prueba `/api/health` en cada uno (en paralelo), usando el primero que responda:
+
+1. `http://localhost:3001` — cable USB (`adb reverse`)
+2. `http://<IP-LAN>:3001` — misma red WiFi
+3. `https://xxx.trycloudflare.com` — cualquier red vía túnel (requiere Norton VPN apagado)
+
+```powershell
+# Desde la raíz del repo VitoStoreApp
+.\scripts\connect-hybrid.ps1          # prepara candidatos y muestra el comando
+.\scripts\connect-hybrid.ps1 -Run     # además flutter run
+.\scripts\connect-hybrid.ps1 -Build   # además compila APK debug e instala
+.\scripts\connect-hybrid.ps1 -NoTunnel  # solo USB + IP LAN
+```
+
+Manual:
+
+```bash
+flutter run --dart-define=API_URLS=http://localhost:3001,http://192.168.1.50:3001,https://xxx.trycloudflare.com
+```
+
+> Si solo defines `API_URL` (sin `API_URLS`), la app usa ese valor fijo como antes.
+
+## Conexión por USB (sin internet, recomendado para desarrollo)
+
+Para que la app en un dispositivo físico hable con el backend local **solo por el cable USB** (sin túnel ni red WiFi), usa `adb reverse`:
+
+```powershell
+# Desde la raíz del repo VitoStoreApp, con el teléfono conectado por USB
+.\scripts\connect-usb.ps1          # mapea puerto 3001 y verifica
+.\scripts\connect-usb.ps1 -Run     # además flutter run con la URL USB
+.\scripts\connect-usb.ps1 -Build   # además compila APK debug e instala
+```
+
+Esto mapea `localhost:3001` del teléfono → `localhost:3001` de la PC (`vito-api`). La app se compila con:
+
+```bash
+flutter run --dart-define=API_URL=http://localhost:3001
+```
+
+> **Importante:** `adb reverse` **no sobrevive** reinicios o desconexiones del teléfono. Vuelve a correr `connect-usb.ps1` cada vez que reconectes el dispositivo. Requisito: el stack backend de Docker corriendo.
+
 ## Acceso remoto (Cloudflare Tunnel)
 
 Para usar la app de forma remota (dispositivo físico fuera de tu red, demos, pruebas) sin exponer puertos ni configurar un dominio, el repo incluye un contenedor **Cloudflare Quick Tunnel** propio de VitoStoreApp que expone `vito-api:3001` por HTTPS.

@@ -2,8 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../contact/data/contact_repository.dart';
 import '../data/chatbot_service.dart';
 import '../domain/chat_message.dart';
+
+/// Respuestas rapidas sugeridas (espejo de QUICK_RESPONSES del ChatWidget web).
+const List<String> _quickResponses = [
+  '¿Cuáles son sus horarios de atención?',
+  'Necesito una cotización',
+  'Tengo un problema técnico',
+  'Información sobre productos',
+];
+
+/// Palabras clave que sugieren intencion de contacto (espejo del ChatWidget web).
+const _contactKeywords = ['contact', 'llam', 'email', 'cotiz', 'correo', 'teléfon', 'telefono'];
 
 /// Bottom sheet con la interfaz del chatbot "Asistente VITO".
 /// Muestra lista de mensajes (burbujas), indicador de escritura y campo de
@@ -34,6 +46,14 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
   final _scrollController = ScrollController();
   bool _isTyping = false;
 
+  // Formulario de contacto inline (espejo del ChatWidget web).
+  bool _showContactForm = false;
+  final _contactFormKey = GlobalKey<FormState>();
+  final _cNameController = TextEditingController();
+  final _cEmailController = TextEditingController();
+  final _cPhoneController = TextEditingController();
+  bool _sendingContact = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +61,18 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
     _messages.add(ChatMessage.bot(
       'Hola, soy el Asistente VITO. En que puedo ayudarte hoy?',
     ));
+  }
+
+  @override
+  void dispose() {
+    // Al cerrar el chat, resetear la sesión del asistente (best-effort).
+    ref.read(chatbotServiceProvider).resetSession();
+    _inputController.dispose();
+    _scrollController.dispose();
+    _cNameController.dispose();
+    _cEmailController.dispose();
+    _cPhoneController.dispose();
+    super.dispose();
   }
 
   void _scrollToBottom() {
@@ -76,6 +108,20 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
         _isTyping = false;
         _messages.add(ChatMessage.bot(answer));
       });
+      // Detectar intencion de contacto y ofrecer el formulario inline.
+      final lower = text.toLowerCase();
+      if (_contactKeywords.any((k) => lower.contains(k)) && !_showContactForm) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (!mounted) return;
+          setState(() {
+            _messages.add(ChatMessage.bot(
+              'Si deseas que te contactemos, por favor completa tus datos a continuacion.',
+            ));
+            _showContactForm = true;
+          });
+          _scrollToBottom();
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -88,13 +134,62 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
     _scrollToBottom();
   }
 
-  @override
-  void dispose() {
-    // Al cerrar el chat, resetear la sesión del asistente (best-effort).
-    ref.read(chatbotServiceProvider).resetSession();
-    _inputController.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  /// Envia el formulario de contacto inline (reutiliza ContactRepository).
+  Future<void> _submitContactForm() async {
+    if (!_contactFormKey.currentState!.validate()) return;
+    setState(() => _sendingContact = true);
+    try {
+      final repo = ref.read(contactRepositoryProvider);
+      final ok = await repo.sendMessage(
+        name: _cNameController.text.trim(),
+        email: _cEmailController.text.trim(),
+        phone: _cPhoneController.text.trim().isEmpty
+            ? null
+            : _cPhoneController.text.trim(),
+        subject: 'Solicitud desde chatbot',
+        message: 'El usuario solicito contacto desde el asistente VITO.',
+      );
+      if (!mounted) return;
+      if (ok) {
+        setState(() {
+          _showContactForm = false;
+          _messages.add(ChatMessage.bot(
+            'Gracias por tus datos. Un asesor se comunicara contigo pronto.',
+          ));
+        });
+        _cNameController.clear();
+        _cEmailController.clear();
+        _cPhoneController.clear();
+      } else {
+        setState(() {
+          _messages.add(ChatMessage.bot(
+            'No pude enviar tus datos. Intenta de nuevo mas tarde.',
+          ));
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage.bot(
+          'Ocurrio un error al enviar tus datos. Intenta de nuevo.',
+        ));
+      });
+    } finally {
+      if (mounted) setState(() => _sendingContact = false);
+    }
+    _scrollToBottom();
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return 'El correo es obligatorio';
+    final regex = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
+    if (!regex.hasMatch(value.trim())) return 'Ingresa un correo valido';
+    return null;
+  }
+
+  String? _required(String? value, String field) {
+    if (value == null || value.trim().isEmpty) return '$field es obligatorio';
+    return null;
   }
 
   @override
@@ -155,6 +250,113 @@ class _ChatbotSheetState extends ConsumerState<ChatbotSheet> {
               itemBuilder: (context, index) => _MessageBubble(message: _messages[index]),
             ),
           ),
+          // Respuestas rapidas (solo al inicio, como en el ChatWidget web).
+          if (_messages.length <= 2 && !_showContactForm && !_isTyping)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final q in _quickResponses)
+                    ActionChip(
+                      label: Text(q, style: const TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        _inputController.text = q;
+                        _send();
+                      },
+                    ),
+                ],
+              ),
+            ),
+          // Formulario de contacto inline (espejo del ChatWidget web).
+          if (_showContactForm)
+            Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Form(
+                key: _contactFormKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Dejanos tus datos para contactarte',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _cNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tu nombre',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) => _required(v, 'El nombre'),
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _cEmailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tu email',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: _validateEmail,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _cPhoneController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tu telefono (opcional)',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: _sendingContact
+                              ? null
+                              : () => setState(() => _showContactForm = false),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: _sendingContact ? null : _submitContactForm,
+                            icon: _sendingContact
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(LucideIcons.send, size: 16),
+                            label: Text(_sendingContact ? 'Enviando...' : 'Enviar'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Indicador de escritura
           if (_isTyping)
             Padding(

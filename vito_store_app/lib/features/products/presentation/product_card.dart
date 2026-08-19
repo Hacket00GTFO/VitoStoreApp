@@ -146,6 +146,7 @@ class _ProductImage extends StatelessWidget {
     final url = (image != null && image!.isNotEmpty) ? image : null;
     Widget content;
     if (url == null) {
+      debugPrint('[ProductCard] Sin URL de imagen (image=null)');
       content = Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
@@ -153,18 +154,47 @@ class _ProductImage extends StatelessWidget {
         ),
       );
     } else {
+      debugPrint('[ProductCard] Cargando imagen: $url');
       content = CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
         width: double.infinity,
+        httpHeaders: const {'Accept': 'image/webp,image/*,*/*'},
         placeholder: (context, url) => Container(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
-        errorWidget: (context, url, error) => Container(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: const Center(child: Icon(LucideIcons.imageOff, size: 32)),
-        ),
+        errorWidget: (context, url, error) {
+          debugPrint('[ProductCard] ERROR cargando imagen: $url -- $error');
+          return Container(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(LucideIcons.imageOff, size: 20),
+                  const SizedBox(height: 4),
+                  Text(
+                    'URL:\n$url',
+                    style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Error: $error',
+                    style: const TextStyle(fontSize: 7),
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       );
     }
     return Hero(

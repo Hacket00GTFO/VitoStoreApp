@@ -78,13 +78,8 @@ class _ServiceCard extends StatelessWidget {
   final IconData icon;
 
   void _solicitar(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Solicitud de "${service.name}" enviada (Fase 6: contacto)'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    context.push('/contacto');
+    final subject = 'Solicitud de servicio: ${service.name}';
+    context.push('/contacto?subject=${Uri.encodeQueryComponent(subject)}');
   }
 
   @override
