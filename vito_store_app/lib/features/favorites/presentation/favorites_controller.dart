@@ -1,16 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/presentation/auth_controller.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/product.dart';
+import '../data/favorites_repository.dart';
 
-/// Controlador de favoritos en memoria (Set de ids).
+/// Controlador de favoritos (wishlist) con sincronizacion al backend.
 ///
-/// La sincronizacion con el backend (wishlist API) es Fase 4+.
-/// Por ahora se mantiene un estado simple en memoria que sobrevive mientras
-/// la app esta viva (Riverpod lo conserva).
+/// - Mantiene un Set de IDs en memoria para acceso inmediato (UI responsiva).
+/// - Cuando el usuario esta autenticado, sincroniza con el backend via
+///   [FavoritesRepository] (POST/DELETE /api/wishlist).
+/// - Al iniciar sesion, carga los favoritos del backend.
+/// - Si no esta autenticado, opera solo en memoria.
 class FavoritesNotifier extends Notifier<Set<String>> {
   @override
-  Set<String> build() => <String>{};
+  Set<String> build() {
+    // Cargar favoritos del backend si el usuario esta autenticado.
+    Future.microtask(_syncFromBackend);
+    return <String>{};
+  }
+
+  FavoritesRepository get _repo =>
+      ref.read(favoritesRepositoryProvider);
+
+  bool _isAuthenticated() =>
+      ref.read(authControllerProvider).isAuthenticated;
+
+  Future<void> _syncFromBackend() async {
+    if (!_isAuthenticated()) return;
+    try {
+      final ids = await _repo.getFavoriteIds();
+      if (ids.isNotEmpty) {
+        state = {...state, ...ids};
+      }
+    } catch (_) {}
+  }
 
   bool isFavorite(String id) => state.contains(id);
 
@@ -18,6 +42,11 @@ class FavoritesNotifier extends Notifier<Set<String>> {
     final next = Set<String>.from(state);
     if (!next.add(id)) {
       next.remove(id);
+      // Remover del backend.
+      if (_isAuthenticated()) _repo.removeFavorite(id);
+    } else {
+      // Agregar al backend.
+      if (_isAuthenticated()) _repo.addFavorite(id);
     }
     state = next;
   }
@@ -25,6 +54,12 @@ class FavoritesNotifier extends Notifier<Set<String>> {
   void remove(String id) {
     final next = Set<String>.from(state)..remove(id);
     state = next;
+    if (_isAuthenticated()) _repo.removeFavorite(id);
+  }
+
+  /// Recarga los favoritos desde el backend (pull-to-refresh).
+  Future<void> refresh() async {
+    await _syncFromBackend();
   }
 }
 

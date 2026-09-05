@@ -1,20 +1,17 @@
-﻿import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../config/api_config.dart';
 import '../../../config/theme/app_colors.dart';
+import '../../../core/i18n/app_strings.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../products/data/category_repository.dart';
 import '../../products/data/product_repository.dart';
 import '../../products/domain/category.dart';
 import '../../products/domain/product.dart';
 import '../../products/presentation/product_card.dart';
-
-/// Notifier global de debug (temporal) para mostrar info de diagnostico.
-final _debugInfoNotifier = ValueNotifier<String>('Inicializando...');
 
 /// Home page completo.
 ///
@@ -53,16 +50,6 @@ class HomePage extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final cartCount = ref.watch(cartControllerProvider.select((c) => c.totalQuantity));
 
-    // DEBUG: actualizar info de diagnostico.
-    featuredAsync.whenData((products) {
-      final firstImg = products.isNotEmpty ? products.first.images.firstOrNull : null;
-      _debugInfoNotifier.value =
-          'baseUrl: ${ApiConfig.baseUrl}\n'
-          'resolvedBaseUrl: ${ApiConfig.resolvedBaseUrl ?? "(no resuelto)"}\n'
-          'productos: ${products.length}\n'
-          'primera imagen: $firstImg';
-    });
-
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
@@ -76,9 +63,9 @@ class HomePage extends ConsumerWidget {
             expandedHeight: 240,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                'VITO Technologies',
-                style: TextStyle(
+              title: Text(
+                ref.tr('appTitle'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -92,13 +79,13 @@ class HomePage extends ConsumerWidget {
                     colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                 ),
-                child: const Align(
+                child: Align(
                   alignment: Alignment.bottomLeft,
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 0, 20, 56),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 56),
                     child: Text(
-                      'Tecnologia que impulsa tu negocio',
-                      style: TextStyle(
+                      ref.tr('technologyThatBoosts'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
@@ -110,7 +97,7 @@ class HomePage extends ConsumerWidget {
             ),
             actions: [
               IconButton(
-                tooltip: 'Carrito',
+                tooltip: ref.tr('cart'),
                 icon: Badge(
                   isLabelVisible: cartCount > 0,
                   label: Text('$cartCount'),
@@ -119,32 +106,13 @@ class HomePage extends ConsumerWidget {
                 onPressed: () => context.push('/carrito'),
               ),
               IconButton(
-                tooltip: 'Favoritos',
+                tooltip: ref.tr('favorites'),
                 icon: const Icon(LucideIcons.heart, color: Colors.white),
                 onPressed: () => context.push('/favoritos'),
               ),
             ],
           ),
 
-          // DEBUG temporal: mostrar baseUrl y primera URL de imagen.
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber),
-              ),
-              child: ValueListenableBuilder<String>(
-                valueListenable: _debugInfoNotifier,
-                builder: (context, info, _) => Text(
-                  info,
-                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                ),
-              ),
-            ),
-          ),
           // Accesos rapidos
           SliverPadding(
             padding: const EdgeInsets.all(16),
@@ -158,22 +126,22 @@ class HomePage extends ConsumerWidget {
               delegate: SliverChildListDelegate([
                 _QuickAccess(
                   icon: LucideIcons.package,
-                  title: 'Productos',
+                  title: ref.tr('products'),
                   onTap: () => context.push('/productos'),
                 ),
                 _QuickAccess(
                   icon: LucideIcons.wrench,
-                  title: 'Servicios',
+                  title: ref.tr('services'),
                   onTap: () => context.push('/servicios'),
                 ),
                 _QuickAccess(
                   icon: LucideIcons.newspaper,
-                  title: 'Blog',
+                  title: ref.tr('blog'),
                   onTap: () => context.push('/blog'),
                 ),
                 _QuickAccess(
                   icon: LucideIcons.mail,
-                  title: 'Contacto',
+                  title: ref.tr('contact'),
                   onTap: () => context.push('/contacto'),
                 ),
               ]),
@@ -212,7 +180,7 @@ class HomePage extends ConsumerWidget {
           // Categorias
           _SectionHeader(
             title: 'Categorias',
-            actionLabel: 'Ver todo',
+            actionLabel: ref.tr('viewAll'),
             onAction: () => context.push('/productos'),
           ),
           SliverPadding(
@@ -250,8 +218,8 @@ class HomePage extends ConsumerWidget {
 
           // Servicios (grid rapido)
           _SectionHeader(
-            title: 'Servicios',
-            actionLabel: 'Ver todo',
+            title: ref.tr('services'),
+            actionLabel: ref.tr('viewAll'),
             onAction: () => context.push('/servicios'),
           ),
           SliverPadding(

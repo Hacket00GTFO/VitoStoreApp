@@ -5,9 +5,11 @@ import '../../../config/api_config.dart';
 import '../../../shared/providers/providers.dart';
 import '../domain/order.dart';
 
-/// Repositorio de cuenta. Consume `/api/orders`, `/api/account/me`.
+/// Repositorio de cuenta. Consume `/api/orders`, `/api/quotes`,
+/// `/api/invoices`, `/api/account/me`, `/api/services/user`.
 ///
-/// Maneja ordenes del usuario, perfil y actualizacion de datos.
+/// Maneja ordenes, cotizaciones, facturas, servicios del usuario,
+/// perfil, actualizacion de datos y cambio de contrasena.
 class AccountRepository {
   AccountRepository(this._dio);
 
@@ -21,6 +23,46 @@ class AccountRepository {
         ? data
         : (data['data'] as List?) ?? (data['orders'] as List?) ?? [];
     return items.map((e) => Order.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Lista de cotizaciones del usuario autenticado.
+  Future<List<Map<String, dynamic>>> getQuotes() async {
+    final resp = await _dio.get(ApiEndpoints.quotes);
+    final data = resp.data;
+    final List<dynamic> items = data is List
+        ? data
+        : (data is Map<String, dynamic>
+            ? (data['data'] as List?) ?? (data['quotes'] as List?) ?? []
+            : []);
+    return items.cast<Map<String, dynamic>>().toList();
+  }
+
+  /// Lista de facturas del usuario autenticado.
+  Future<List<Map<String, dynamic>>> getInvoices() async {
+    final resp = await _dio.get(ApiEndpoints.invoices);
+    final data = resp.data;
+    final List<dynamic> items = data is List
+        ? data
+        : (data is Map<String, dynamic>
+            ? (data['data'] as List?) ?? (data['invoices'] as List?) ?? []
+            : []);
+    return items.cast<Map<String, dynamic>>().toList();
+  }
+
+  /// Lista de servicios solicitados por el usuario.
+  Future<List<Map<String, dynamic>>> getUserServices() async {
+    try {
+      final resp = await _dio.get('${ApiEndpoints.services}/user');
+      final data = resp.data;
+      final List<dynamic> items = data is List
+          ? data
+          : (data is Map<String, dynamic>
+              ? (data['data'] as List?) ?? (data['services'] as List?) ?? []
+              : []);
+      return items.cast<Map<String, dynamic>>().toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Obtiene el perfil del usuario autenticado.
@@ -55,6 +97,19 @@ class AccountRepository {
           : data;
     }
     return <String, dynamic>{};
+  }
+
+  /// Cambia la contrasena del usuario autenticado.
+  ///
+  /// Requiere la contrasena actual y la nueva.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _dio.put('${ApiEndpoints.profile}/password', data: {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
   }
 }
 

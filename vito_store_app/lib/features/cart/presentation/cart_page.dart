@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/i18n/app_strings.dart';
 import '../../../shared/widgets/state_view.dart';
 import 'cart_controller.dart';
 import '../domain/cart_item.dart';
@@ -25,7 +26,7 @@ class CartPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Carrito'),
+        title: Text(ref.tr('cart')),
         actions: [
           if (cart.items.isNotEmpty && !cart.isUpdating)
             IconButton(
@@ -54,7 +55,7 @@ class CartPage extends ConsumerWidget {
     if (cart.isEmpty) {
       return EmptyState(
         icon: LucideIcons.shoppingCart,
-        message: 'Tu carrito esta vacio',
+        message: ref.tr('emptyCart'),
         actionLabel: 'Explorar productos',
         onAction: () => context.go('/tienda'),
       );
@@ -264,13 +265,13 @@ class _CartItemTile extends StatelessWidget {
 }
 
 /// Resumen del carrito con subtotal, total y boton de checkout.
-class _CartSummary extends StatelessWidget {
+class _CartSummary extends ConsumerWidget {
   const _CartSummary({required this.cart});
 
   final CartState cart;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -283,18 +284,18 @@ class _CartSummary extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _summaryRow(context, 'Subtotal', _formatPrice(cart.subtotal)),
+            _summaryRow(context, ref.tr('subtotal'), _formatPrice(cart.subtotal)),
             const SizedBox(height: 8),
             _summaryRow(
               context,
-              'Total (${cart.totalQuantity} ${cart.totalQuantity == 1 ? 'articulo' : 'articulos'})',
+              '${ref.tr('total')} (${cart.totalQuantity} ${cart.totalQuantity == 1 ? ref.tr('item') : ref.tr('items')})',
               _formatPrice(cart.totalAmount),
               isTotal: true,
             ),
             if (cart.totals.subtotalUSD > 0) ...[
               const SizedBox(height: 8),
               Text(
-                'Incluye conversion USD→MXN @ ${cart.totals.exchangeRate}',
+                'Incluye conversion USD?MXN @ ${cart.totals.exchangeRate}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
                     ),

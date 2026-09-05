@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/i18n/app_strings.dart';
 import '../../../shared/widgets/state_view.dart';
 import '../data/blog_repository.dart';
 import '../domain/blog_post.dart';
@@ -46,7 +47,7 @@ class _BlogPageState extends ConsumerState<BlogPage> {
     final postsAsync = ref.watch(blogPostsProvider(_selectedCategory));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Blog')),
+      appBar: AppBar(title: Text(ref.tr('blog'))),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: Column(

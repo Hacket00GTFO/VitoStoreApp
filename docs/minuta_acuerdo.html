@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Minuta de Acuerdo - VitoStoreApp</title>
+<style>
+  @page {
+    size: A4;
+    margin: 22mm 18mm 20mm 18mm;
+    @bottom-center {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 9px;
+      color: #888;
+    }
+    @bottom-right {
+      content: "VITO Technologies — Minuta de Acuerdo";
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 8px;
+      color: #aaa;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #1f2937;
+    font-size: 11px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  h1 {
+    font-size: 22px;
+    color: #0f3d6e;
+    margin: 0 0 4px 0;
+    border-bottom: 3px solid #0f3d6e;
+    padding-bottom: 8px;
+  }
+  h2 {
+    font-size: 15px;
+    color: #0f3d6e;
+    margin: 22px 0 8px 0;
+    padding: 5px 10px;
+    background: #eef4fb;
+    border-left: 4px solid #0f3d6e;
+  }
+  h3 {
+    font-size: 12.5px;
+    color: #1a4d80;
+    margin: 14px 0 6px 0;
+  }
+  p { margin: 6px 0; text-align: justify; }
+  .subtitle {
+    font-size: 13px;
+    color: #555;
+    margin: 2px 0 0 0;
+    font-weight: 600;
+  }
+  .meta {
+    font-size: 10.5px;
+    color: #666;
+    margin-top: 2px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 10px 0;
+    font-size: 10px;
+  }
+  th {
+    background: #0f3d6e;
+    color: #fff;
+    text-align: left;
+    padding: 6px 8px;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #d1d5db;
+    padding: 6px 8px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .header-block {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .brand {
+    font-size: 11px;
+    color: #0f3d6e;
+    font-weight: 700;
+    text-align: right;
+  }
+  .brand .tagline {
+    font-weight: 400;
+    font-style: italic;
+    color: #666;
+    font-size: 9.5px;
+  }
+  ul, ol { margin: 6px 0 8px 0; padding-left: 20px; }
+  li { margin: 3px 0; text-align: justify; }
+  .sign-block {
+    margin-top: 14px;
+    page-break-inside: avoid;
+  }
+  .sign-line {
+    border-top: 1px solid #333;
+    width: 75%;
+    margin: 28px 0 4px 0;
+  }
+  .sign-name {
+    font-weight: 700;
+    font-size: 10.5px;
+  }
+  .sign-role {
+    font-size: 9.5px;
+    color: #555;
+  }
+  .sign-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 30px;
+    margin-top: 10px;
+  }
+  .sign-item {
+    flex: 1 1 45%;
+    min-width: 45%;
+  }
+  blockquote {
+    border-left: 3px solid #0f3d6e;
+    background: #eef4fb;
+    margin: 8px 0;
+    padding: 6px 12px;
+    font-style: italic;
+    color: #1a4d80;
+  }
+  .note {
+    font-size: 9.5px;
+    color: #777;
+    font-style: italic;
+  }
+  .page-break { page-break-before: always; }
+  .small { font-size: 9.5px; color: #555; }
+  .pill {
+    display: inline-block;
+    background: #0f3d6e;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 9px;
+    margin-right: 4px;
+  }
+  .footer-doc {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #ccc;
+    text-align: center;
+    font-size: 9px;
+    color: #888;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="header-block">
+  <div>
+    <h1>MINUTA DE ACUERDO</h1>
+    <div class="subtitle">Incursión de VITO Technologies en el mercado digital mediante aplicación móvil (VitoStoreApp)</div>
+  </div>
+  <div class="brand">
+    VITO TECHNOLOGIES<br>
+    <span class="tagline">Tecnología que transforma, confianza que impulsa</span>
+  </div>
+</div>
+
+<h2>1. Datos de la reunión</h2>
+<table>
+  <tr><th style="width:28%">Fecha</th><td>4 de septiembre de 2026</td></tr>
+  <tr><th>Hora</th><td>10:00 – 11:30 hrs (CDMX)</td></tr>
+  <tr><th>Modalidad</th><td>Híbrida (presencial / videollamada)</td></tr>
+  <tr><th>Lugar</th><td>Oficinas de VITO Technologies, Monterrey, Nuevo León, México</td></tr>
+  <tr><th>Objetivo</th><td>Formalizar el interés y aceptación de VITO Technologies para incursionar en el mercado digital mediante el desarrollo y lanzamiento de una aplicación móvil (VitoStoreApp) para iOS y Android, así como conciliar el plan de trabajo entre el equipo de alumnos desarrolladores y el cliente.</td></tr>
+</table>
+
+<h2>2. Partes intervinientes</h2>
+
+<h3>2.1 Por el cliente — VITO Technologies</h3>
+<table>
+  <tr><th style="width:35%">Nombre</th><th style="width:30%">Cargo</th><th>Rol en el proyecto</th></tr>
+  <tr><td>Carlos Gamaliel Rodríguez Medina</td><td>Director Comercial / de Ventas</td><td>Representante del cliente y patrocinador del proyecto</td></tr>
+  <tr><td>(Representante de Dirección General)</td><td>Dirección General / Propietario</td><td>Autorizador estratégico</td></tr>
+</table>
+
+<h3>2.2 Por el equipo de alumnos desarrolladores</h3>
+<table>
+  <tr><th style="width:35%">Nombre</th><th style="width:25%">Matrícula / ID</th><th>Rol en el proyecto</th></tr>
+  <tr><td>Norberto Suaste Hernández</td><td>al03088785</td><td>Desarrollo integral del proyecto (Full-stack / Flutter / Backend / UX-UI / QA)</td></tr>
+</table>
+
+<h2>3. Antecedentes</h2>
+<p>
+VITO Technologies es una empresa mexicana fundada en 2018, con sede en Monterrey, N.L., dedicada a ofrecer soluciones tecnológicas integrales para industria, logística, retail y salud. Como <strong>Partner oficial de Zebra Technologies en México</strong>, distribuye impresoras industriales, terminales robustas, scanners, lectores RFID, consumibles, equipos de cómputo, redes, seguridad y energía solar, además de servicios de renta de terminales, soporte certificado e integración de proyectos.
+</p>
+<p>
+Actualmente la empresa cuenta con un sitio institucional (<code>vitotechnologies.com</code>) y un e-commerce web (<code>desingVITO</code>) sobre un backend Express/Prisma/PostgreSQL (<code>vito_db</code>). Sin embargo, <strong>no dispone de un canal móvil nativo</strong> que permita a sus clientes comprar, cotizar y dar seguimiento desde su smartphone, lo cual representa una oportunidad de mejora en el servicio y la atención a clientes, así como una brecha competitiva frente a integradores del mismo nicho.
+</p>
+<p>
+En reuniones previas se presentó la propuesta ejecutiva <em>"Estrategia de incursión al mercado digital mediante aplicación móvil iOS"</em>, identificando las áreas de oportunidad, los medios digitales actuales y el impacto esperado en la satisfacción del cliente. La presente minuta formaliza la aceptación de dicha propuesta.
+</p>
+
+<h2>4. Declaración de interés y aceptación</h2>
+<p>
+<strong>VITO Technologies</strong>, por conducto de su representante debidamente autorizado, <strong>manifiesta su interés y aceptación</strong> para incursionar en el mercado digital mediante el desarrollo y lanzamiento de la aplicación móvil <strong>VitoStoreApp</strong> (iOS y Android), construida en <strong>Flutter</strong>, que consumirá el <strong>mismo backend Express/Prisma/PostgreSQL (<code>vito_db</code>)</strong> del e-commerce web existente, garantizando una experiencia <strong>omnicanal</strong> (una base de datos, dos clientes: web y app) con la misma cuenta, mismos pedidos, mismo carrito y misma sesión para el usuario final.
+</p>
+<p>
+El equipo de <strong>alumnos desarrolladores</strong> se compromete a ejecutar el plan de trabajo conciliado que se describe en la sección 5, bajo la supervisión y validación del cliente, entregando un producto funcional, probado y listo para publicación en la <strong>App Store de Apple</strong> y <strong>Google Play Store</strong>.
+</p>
+
+<h2>5. Plan de trabajo conciliado</h2>
+<p>
+El plan de trabajo se estructura en <strong>10 fases</strong> (Fase 0 a Fase 9), alineadas con el roadmap definido en el repositorio del proyecto <code>VitoStoreApp</code>. Las fechas son estimadas y podrán ajustarse de común acuerdo entre las partes.
+</p>
+<table>
+  <tr><th style="width:20%">Fase</th><th style="width:30%">Descripción</th><th style="width:32%">Entregables</th><th style="width:18%">Entrega estimada</th></tr>
+  <tr><td><strong>Fase 0 — Scaffold y base</strong></td><td>Estructura del proyecto Flutter, tema de marca (<code>vito-*</code>), capa de red (dio + interceptores), autenticación básica, routing con go_router, placeholders de pantallas.</td><td>Proyecto compilable en iOS y Android; login funcional contra <code>vito_db</code>.</td><td>Semana 1–2</td></tr>
+  <tr><td><strong>Fase 1 — Autenticación completa</strong></td><td>Registro, verificación de cuenta, 2FA, OAuth (Google/Apple), refresh de tokens con single-flight.</td><td>Flujo de auth completo y seguro (Keychain/Keystore).</td><td>Semana 3–4</td></tr>
+  <tr><td><strong>Fase 2 — Home y navegación</strong></td><td>Pantalla de inicio, menú lateral (MainShell), navegación declarativa completa, deep links.</td><td>App navegable con todas las secciones accesibles.</td><td>Semana 5</td></tr>
+  <tr><td><strong>Fase 3 — Catálogo, tienda y favoritos</strong></td><td>Listado de productos por línea (impresoras, terminales, consumibles, redes, seguridad, cómputo), búsqueda, filtros, detalle de producto, wishlist.</td><td>Catálogo funcional consumiendo la API REST.</td><td>Semana 6–7</td></tr>
+  <tr><td><strong>Fase 4 — Carrito, checkout y Stripe</strong></td><td>Carrito de compras, checkout con <code>flutter_stripe</code>, Apple Pay, confirmación de pedido.</td><td>Compra end-to-end funcional.</td><td>Semana 8–9</td></tr>
+  <tr><td><strong>Fase 5 — Cuenta y notificaciones</strong></td><td>UserHub (perfil, historial de pedidos, rentas activas, datos fiscales, direcciones), notificaciones push.</td><td>Autoservicio del cliente habilitado.</td><td>Semana 10–11</td></tr>
+  <tr><td><strong>Fase 6 — Blog, eventos y contacto</strong></td><td>Sección de blog/eventos de marca, formulario de contacto, integración con contenido de LinkedIn.</td><td>Canal de contenido y contacto en la app.</td><td>Semana 12</td></tr>
+  <tr><td><strong>Fase 7 — Chatbot Socket.IO</strong></td><td>Chatbot en tiempo real para soporte y asesoría técnica dentro de la app.</td><td>Soporte inmediato funcional.</td><td>Semana 13</td></tr>
+  <tr><td><strong>Fase 8 — i18n, accesibilidad y tests</strong></td><td>Internacionalización (español/inglés), accesibilidad (VoiceOver, Dynamic Type, safe areas HIG), pruebas unitarias y de integración.</td><td>App accesible y probada.</td><td>Semana 14–15</td></tr>
+  <tr><td><strong>Fase 9 — Release</strong></td><td>Iconos, splash screen, firmado de release, publicación en App Store y Google Play Store, documentación final.</td><td>APK/IPA firmados y publicados; manual de despliegue.</td><td>Semana 16</td></tr>
+</table>
+
+<h3>5.1 Consideraciones técnicas acordadas</h3>
+<ul>
+  <li><span class="pill">Stack</span> Flutter 3.35+ / Dart 3.9+, Riverpod, dio, go_router, <code>flutter_secure_storage</code>, <code>socket_io_client</code>, <code>cached_network_image</code>, <code>flutter_stripe</code>, <code>lucide_icons</code>, fuente Montserrat.</li>
+  <li><span class="pill">Backend</span> Express + Prisma + PostgreSQL (<code>vito_db</code>). La app <strong>no tiene base de datos propia</strong>; ambos clientes (web y app) consultan la misma API REST.</li>
+  <li><span class="pill">Diseño</span> Paleta de marca <code>vito-*</code> replicada de <code>tailwind.config.js</code> de la web; Material 3 con dark mode OLED; touch targets ≥48dp; cumplimiento de <strong>HIG de Apple</strong> (edge-swipe, Dynamic Type, safe areas) y <strong>Material 3 Android</strong> (ripple, predictive back).</li>
+  <li><span class="pill">Acceso remoto</span> Túnel Cloudflare (<code>docker-compose.cloudflared.yml</code>) para demos con clientes fuera de red.</li>
+  <li><span class="pill">Seguridad</span> Tokens en Keychain (iOS) / Keystore (Android); Bearer auth con refresh; no se exponen ni registran secretos en el repositorio.</li>
+</ul>
+
+<h3>5.2 Responsabilidades de las partes</h3>
+<p><strong>Del equipo de alumnos:</strong></p>
+<ul>
+  <li>Desarrollar las 10 fases del plan de trabajo.</li>
+  <li>Realizar pruebas funcionales y de integración en cada fase.</li>
+  <li>Entregar código versionado en el repositorio <code>VitoStoreApp</code>.</li>
+  <li>Documentar el despliegue y publicar en App Store y Google Play (Fase 9).</li>
+  <li>Reportar avances al cliente en reuniones de seguimiento quincenales.</li>
+</ul>
+<p><strong>De VITO Technologies (cliente):</strong></p>
+<ul>
+  <li>Proveer acceso al backend <code>vito_db</code> y a la API REST del e-commerce <code>desingVITO</code>.</li>
+  <li>Suministrar assets de marca (logotipos, paleta, tipografía, imágenes de productos).</li>
+  <li>Validar entregables por fase y retroalimentar en un máximo de 5 días hábiles.</li>
+  <li>Facilitar un grupo de <strong>5–10 clientes piloto</strong> en Monterrey para la fase de pruebas (Fase 9).</li>
+  <li>Cubrir los costos de publicación en App Store y Google Play, así como las claves de Stripe (modo producción) cuando corresponda.</li>
+</ul>
+
+<h3>5.3 Criterios de aceptación</h3>
+<p>El proyecto se considerará <strong>concluido</strong> cuando:</p>
+<ol>
+  <li>La app compile y funcione en iOS (iPhone) y Android.</li>
+  <li>El cliente pueda registrarse, navegar el catálogo, agregar al carrito, pagar con Stripe/Apple Pay y consultar el historial de pedidos.</li>
+  <li>El chatbot Socket.IO responda en tiempo real.</li>
+  <li>La app esté publicada (o lista para publicar) en App Store y Google Play.</li>
+  <li>Se entregue la documentación final y el manual de despliegue.</li>
+</ol>
+
+<h2>6. Compromisos y confidencialidad</h2>
+<ul>
+  <li>Las partes se comprometen a mantener <strong>confidencialidad</strong> sobre la información técnica, comercial y de clientes a la que tengan acceso durante el proyecto.</li>
+  <li>El código fuente del proyecto <code>VitoStoreApp</code> queda bajo el control del equipo de alumnos para fines académicos, cediendo a VITO Technologies los derechos de uso comercial del producto final.</li>
+  <li>Cualquier modificación al plan de trabajo deberá ser acordada por escrito (o por correo electrónico) entre las partes con al menos 5 días hábiles de anticipación.</li>
+</ul>
+
+<h2>7. Vigencia</h2>
+<p>
+El presente acuerdo entra en vigor el día de la firma y concluye con la entrega y aceptación final del proyecto (Fase 9), estimada en <strong>16 semanas</strong>, salvo prórroga acordada entre las partes.
+</p>
+
+<div class="page-break"></div>
+
+<h2>8. Firmas</h2>
+<p>En señal de conformidad con todo lo aquí expuesto, las partes firman la presente minuta de manera digital el <strong>4 de septiembre de 2026</strong>.</p>
+
+<h3>Por VITO Technologies (cliente)</h3>
+<div class="sign-grid">
+  <div class="sign-item">
+    <div class="sign-line"></div>
+    <div class="sign-name">Carlos Gamaliel Rodríguez Medina</div>
+    <div class="sign-role">Director Comercial / de Ventas<br>VITO Technologies<br>ventas@vitotechnologies.com · Tel. 81 1116 3774<br>Fecha: 04 / 09 / 2026</div>
+  </div>
+  <div class="sign-item">
+    <div class="sign-line"></div>
+    <div class="sign-name">(Representante de Dirección General)</div>
+    <div class="sign-role">Dirección General / Propietario<br>VITO Technologies<br>contacto@vitotechnologies.com<br>Fecha: 04 / 09 / 2026</div>
+  </div>
+</div>
+
+<h3>Por el equipo de alumnos desarrolladores</h3>
+<div class="sign-grid">
+  <div class="sign-item">
+    <div class="sign-line"></div>
+    <div class="sign-name">Norberto Suaste Hernández — al03088785</div>
+    <div class="sign-role">Desarrollo integral del proyecto (Full-stack / Flutter / Backend / UX-UI / QA)<br>Correo: al03088785@tecmilenio.mx<br>Fecha: 04 / 09 / 2026</div>
+  </div>
+</div>
+
+<div class="footer-doc">
+  VITO Technologies — Tecnología que transforma, confianza que impulsa · Documento generado el 04 de septiembre de 2026
+</div>
+
+</body>
+</html>

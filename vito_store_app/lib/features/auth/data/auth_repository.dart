@@ -100,6 +100,26 @@ class AuthRepository {
   Future<void> logout(String refreshToken) async {
     await _dio.post(ApiEndpoints.auth.logout, data: {'refreshToken': refreshToken});
   }
+
+  /// Refresca los tokens usando el refreshToken.
+  ///
+  /// Consume `POST /api/account/refresh` con body `{ refreshToken }`.
+  /// Devuelve nuevos accessToken y refreshToken, o null si falla.
+  Future<({String accessToken, String refreshToken})?> refresh({
+    required String refreshToken,
+  }) async {
+    final resp = await _dio.post(ApiEndpoints.auth.refresh, data: {
+      'refreshToken': refreshToken,
+    });
+    final data = resp.data as Map<String, dynamic>;
+    final tokens = data['tokens'] as Map<String, dynamic>?;
+    final access = tokens?['accessToken'] as String?;
+    final refresh = tokens?['refreshToken'] as String?;
+    if (access != null && refresh != null) {
+      return (accessToken: access, refreshToken: refresh);
+    }
+    return null;
+  }
 }
 
 /// Resultado del flujo de login (puede requerir 2FA o devolver tokens).

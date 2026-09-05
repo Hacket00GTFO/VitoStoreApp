@@ -1,8 +1,19 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/contact_repository.dart';
+
+/// Datos de contacto de VITO Technologies (externalizados para facil mantenimiento).
+class _ContactData {
+  static const String phone = '+52 81 1116 3774';
+  static const String phoneDisplay = '81 1116 3774';
+  static const String email = 'contacto@vitotechnologies.com';
+  static const String fullAddress = 'Monterrey, Nuevo Leon, Mexico';
+  static const String mapsUrl =
+      'https://www.google.com/maps/search/?api=1&query=VITO+Technologies+Monterrey+Nuevo+Leon';
+}
 
 /// Pagina de contacto.
 /// Formulario con validacion + datos de contacto y placeholder de mapa.
@@ -199,32 +210,70 @@ class _ContactPageState extends ConsumerState<ContactPage> {
             _ContactInfoTile(
               icon: LucideIcons.phone,
               title: 'Telefono',
-              value: '+52 55 1234 5678',
+              value: _ContactData.phoneDisplay,
+              onTap: () => launchUrl(Uri.parse('tel:${_ContactData.phone.replaceAll(' ', '')}')),
             ),
             _ContactInfoTile(
               icon: LucideIcons.mail,
               title: 'Correo',
-              value: 'contacto@vitotechnologies.com',
+              value: _ContactData.email,
+              onTap: () => launchUrl(Uri.parse('mailto:${_ContactData.email}')),
             ),
             _ContactInfoTile(
               icon: LucideIcons.mapPin,
               title: 'Direccion',
-              value: 'Av. Insurgentes Sur 1234, CDMX, Mexico',
+              value: _ContactData.fullAddress,
+              onTap: () => launchUrl(Uri.parse(_ContactData.mapsUrl)),
             ),
             const SizedBox(height: 24),
-            // Placeholder de mapa
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Container(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+            // Mapa interactivo — abre Google Maps al tocar.
+            GestureDetector(
+              onTap: () => launchUrl(Uri.parse(_ContactData.mapsUrl),
+                  mode: LaunchMode.externalApplication),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(LucideIcons.map, size: 40, color: theme.colorScheme.outline),
-                      const SizedBox(height: 8),
-                      Text('Mapa', style: theme.textTheme.bodyMedium),
+                      // Fondo con gradiente simulando mapa.
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              theme.colorScheme.primaryContainer,
+                              theme.colorScheme.surfaceContainerHighest,
+                            ],
+                          ),
+                        ),
+                        child: CustomPaint(
+                          painter: _MapGridPainter(
+                            color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                      ),
+                      // Pin central.
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(LucideIcons.mapPin,
+                                size: 40, color: theme.colorScheme.primary),
+                            const SizedBox(height: 4),
+                            Text('VITO Technologies',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                )),
+                            Text('Toca para abrir en Maps',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                )),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -243,11 +292,13 @@ class _ContactInfoTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String value;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +309,38 @@ class _ContactInfoTile extends StatelessWidget {
         leading: Icon(icon, color: theme.colorScheme.primary),
         title: Text(title, style: theme.textTheme.labelMedium),
         subtitle: Text(value, style: theme.textTheme.bodyMedium),
+        trailing: onTap != null
+            ? Icon(LucideIcons.chevronRight, size: 18, color: theme.colorScheme.outline)
+            : null,
+        onTap: onTap,
       ),
     );
   }
+}
+
+/// Painter que dibuja una grilla simulando un mapa (sin dependencia de Google Maps).
+class _MapGridPainter extends CustomPainter {
+  const _MapGridPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+
+    // Lineas verticales.
+    const spacing = 30.0;
+    for (double x = 0; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    // Lineas horizontales.
+    for (double y = 0; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

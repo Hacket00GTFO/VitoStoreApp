@@ -1,5 +1,5 @@
-﻿import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Pantalla de mantenimiento — replica del MaintenanceScreen de la web.
 /// Se muestra cuando GET /api/health indica modo mantenimiento.

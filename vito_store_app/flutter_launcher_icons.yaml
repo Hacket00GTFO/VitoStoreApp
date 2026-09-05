@@ -1,0 +1,22 @@
+# Configuracion para flutter_launcher_icons
+# Generar iconos con: dart run flutter_launcher_icons
+#
+# Instalar el paquete primero:
+#   flutter pub add dev:flutter_launcher_icons
+#
+# Luego ejecutar:
+#   dart run flutter_launcher_icons
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/vito-icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0066CC"
+  adaptive_icon_foreground: "assets/icon/vito-icon-foreground.png"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false

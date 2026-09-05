@@ -165,13 +165,15 @@ Ver `C:\Users\Norbe\.devin\plans\plan-75695e3244f1957e.md` para el plan detallad
 
 ## Fases
 
-- **Fase 0** (actual): scaffold, tema, capa de red, auth, routing, placeholders.
-- Fase 1: auth completa (2FA, registro, verify, OAuth).
-- Fase 2: home + navegación completa.
-- Fase 3: catálogo, tienda, favoritos.
-- Fase 4: carrito, checkout, Stripe.
-- Fase 5: cuenta (UserHub), notificaciones.
-- Fase 6: blog, eventos, contacto.
-- Fase 7: chatbot Socket.IO.
-- Fase 8: i18n + accesibilidad + tests.
-- Fase 9: release (iconos, splash, firmado, stores).
+- **Fase 0** ✅: scaffold, tema, capa de red, auth, routing, placeholders.
+- **Fase 1** ✅: auth completa (2FA, registro, verify, refresh de tokens automático).
+- **Fase 2** ✅: home + navegación completa.
+- **Fase 3** ✅: catálogo, tienda, favoritos.
+- **Fase 4** ✅: carrito, checkout, Stripe + MercadoPago + SPEI + opciones de envío.
+- **Fase 5** ✅: cuenta (UserHub), notificaciones, cotizaciones, facturas, servicios, edición de perfil, cambio de contraseña.
+- **Fase 6** ✅: blog, eventos, contacto (con mapa interactivo y datos externalizados).
+- **Fase 7** ✅: chatbot Socket.IO.
+- **Fase 8** ✅: i18n (es/en) + accesibilidad (Semantic labels, VoiceOver/TalkBack) + tests unitarios y de widgets.
+- **Fase 9** ✅: release (splash screen, iconos, manual de despliegue, limpieza debug UI).
+
+> Ver `docs/MANUAL_DESPLIEGUE.md` para instrucciones de compilación, firmado y publicación en App Store y Google Play.

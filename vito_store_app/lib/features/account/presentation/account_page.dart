@@ -1,7 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../auth/domain/user.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -97,18 +99,9 @@ class _AccountPageState extends ConsumerState<AccountPage>
               controller: _tabController,
               children: [
                 _OrdersTab(),
-                _PlaceholderTab(
-                  icon: LucideIcons.fileText,
-                  message: 'Tus cotizaciones apareceran aqui.',
-                ),
-                _PlaceholderTab(
-                  icon: LucideIcons.wrench,
-                  message: 'Tus servicios apareceran aqui.',
-                ),
-                _PlaceholderTab(
-                  icon: LucideIcons.receipt,
-                  message: 'Tus facturas apareceran aqui.',
-                ),
+                _QuotesTab(),
+                _ServicesTab(),
+                _InvoicesTab(),
               ],
             ),
           ),
@@ -153,6 +146,16 @@ class _AccountPageState extends ConsumerState<AccountPage>
             ),
           ),
           IconButton(
+            icon: const Icon(LucideIcons.edit),
+            tooltip: 'Editar perfil',
+            onPressed: () => _showEditProfileDialog(context, user),
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.keyRound),
+            tooltip: 'Cambiar contrasena',
+            onPressed: () => _showChangePasswordDialog(context),
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.logOut, color: Colors.red),
             tooltip: 'Cerrar sesion',
             onPressed: () => _confirmLogout(context),
@@ -179,6 +182,196 @@ class _AccountPageState extends ConsumerState<AccountPage>
               ref.read(authControllerProvider.notifier).logout();
             },
             child: const Text('Cerrar sesion'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditProfileDialog(BuildContext context, User user) {
+    final firstNameCtrl = TextEditingController(text: user.firstName ?? '');
+    final lastNameCtrl = TextEditingController(text: user.lastName ?? '');
+    final phoneCtrl = TextEditingController(text: user.phone ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar perfil'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: firstNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre',
+                  prefixIcon: Icon(LucideIcons.user),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: lastNameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Apellidos',
+                  prefixIcon: Icon(LucideIcons.user),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: phoneCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Telefono',
+                  prefixIcon: Icon(LucideIcons.phone),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                final updated = await ref
+                    .read(accountRepositoryProvider)
+                    .updateProfile(
+                      firstName: firstNameCtrl.text.trim(),
+                      lastName: lastNameCtrl.text.trim(),
+                      phone: phoneCtrl.text.trim(),
+                    );
+                final newUser = User(
+                  id: user.id,
+                  email: user.email,
+                  role: user.role,
+                  firstName: (updated['firstName'] as String?) ??
+                      (firstNameCtrl.text.trim().isEmpty
+                          ? user.firstName
+                          : firstNameCtrl.text.trim()),
+                  lastName: (updated['lastName'] as String?) ??
+                      (lastNameCtrl.text.trim().isEmpty
+                          ? user.lastName
+                          : lastNameCtrl.text.trim()),
+                  phone: (updated['phone'] as String?) ??
+                      (phoneCtrl.text.trim().isEmpty
+                          ? user.phone
+                          : phoneCtrl.text.trim()),
+                  emailVerified: user.emailVerified,
+                );
+                ref.read(authControllerProvider.notifier).updateUser(newUser);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Perfil actualizado')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cambiar contrasena'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: currentCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Contrasena actual',
+                  prefixIcon: Icon(LucideIcons.lock),
+                ),
+                obscureText: true,
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? 'Requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: newCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nueva contrasena',
+                  prefixIcon: Icon(LucideIcons.lock),
+                ),
+                obscureText: true,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Requerido';
+                  if (v.length < 6) return 'Minimo 6 caracteres';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: confirmCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmar contrasena',
+                  prefixIcon: Icon(LucideIcons.lock),
+                ),
+                obscureText: true,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Requerido';
+                  if (v != newCtrl.text) return 'No coinciden';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              Navigator.of(ctx).pop();
+              try {
+                await ref.read(accountRepositoryProvider).changePassword(
+                      currentPassword: currentCtrl.text,
+                      newPassword: newCtrl.text,
+                    );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Contrasena actualizada')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Guardar'),
           ),
         ],
       ),
@@ -405,29 +598,425 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-/// Tab placeholder para secciones aun no implementadas.
-class _PlaceholderTab extends StatelessWidget {
-  const _PlaceholderTab({required this.icon, required this.message});
+/// Tab de cotizaciones: carga la lista via [accountRepositoryProvider].
+class _QuotesTab extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_QuotesTab> createState() => _QuotesTabState();
+}
 
-  final IconData icon;
-  final String message;
+class _QuotesTabState extends ConsumerState<_QuotesTab> {
+  Future<List<Map<String, dynamic>>>? _quotesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _quotesFuture = ref.read(accountRepositoryProvider).getQuotes();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _quotesFuture = ref.read(accountRepositoryProvider).getQuotes();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _quotesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.alertCircle,
+                      size: 48, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error al cargar cotizaciones',
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _refresh,
+                    icon: const Icon(LucideIcons.refreshCw),
+                    label: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            );
+          }
+          final quotes = snapshot.data ?? [];
+          if (quotes.isEmpty) {
+            return ListView(
+              children: [
+                const SizedBox(height: 80),
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(LucideIcons.fileText,
+                          size: 48, color: Theme.of(context).colorScheme.outline),
+                      const SizedBox(height: 16),
+                      const Text('No tienes cotizaciones aun.'),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: quotes.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) =>
+                _QuoteCard(quote: quotes[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Card individual de una cotizacion.
+class _QuoteCard extends StatelessWidget {
+  const _QuoteCard({required this.quote});
+
+  final Map<String, dynamic> quote;
+
+  @override
+  Widget build(BuildContext context) {
+    final number = (quote['quoteNumber'] ?? quote['number'] ?? '-').toString();
+    final status = (quote['status'] ?? 'PENDING').toString();
+    final date = (quote['date'] ?? quote['createdAt'] ?? '').toString();
+    final total = (quote['total'] is num)
+        ? (quote['total'] as num).toDouble()
+        : double.tryParse('${quote['total']}') ?? 0.0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Cotizacion #$number',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                _StatusBadge(status: status),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (date.isNotEmpty)
+              Text(
+                date,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Total', style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  _formatPrice(total),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tab de servicios: carga la lista via [accountRepositoryProvider].
+class _ServicesTab extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_ServicesTab> createState() => _ServicesTabState();
+}
+
+class _ServicesTabState extends ConsumerState<_ServicesTab> {
+  Future<List<Map<String, dynamic>>>? _servicesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _servicesFuture = ref.read(accountRepositoryProvider).getUserServices();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _servicesFuture = ref.read(accountRepositoryProvider).getUserServices();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _servicesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.alertCircle,
+                      size: 48, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error al cargar servicios',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _refresh,
+                    icon: const Icon(LucideIcons.refreshCw),
+                    label: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            );
+          }
+          final services = snapshot.data ?? [];
+          if (services.isEmpty) {
+            return ListView(
+              children: [
+                const SizedBox(height: 80),
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(LucideIcons.wrench,
+                          size: 48, color: Theme.of(context).colorScheme.outline),
+                      const SizedBox(height: 16),
+                      const Text('No tienes servicios solicitados aun.'),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: services.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) =>
+                _ServiceCard(service: services[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Card individual de un servicio.
+class _ServiceCard extends StatelessWidget {
+  const _ServiceCard({required this.service});
+
+  final Map<String, dynamic> service;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (service['name'] ?? service['serviceName'] ?? 'Servicio').toString();
+    final status = (service['status'] ?? 'PENDING').toString();
+    final date = (service['dateRequested'] ?? service['createdAt'] ?? '').toString();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                _StatusBadge(status: status),
+              ],
+            ),
+            if (date.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                date,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tab de facturas: carga la lista via [accountRepositoryProvider].
+class _InvoicesTab extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_InvoicesTab> createState() => _InvoicesTabState();
+}
+
+class _InvoicesTabState extends ConsumerState<_InvoicesTab> {
+  Future<List<Map<String, dynamic>>>? _invoicesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _invoicesFuture = ref.read(accountRepositoryProvider).getInvoices();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _invoicesFuture = ref.read(accountRepositoryProvider).getInvoices();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _invoicesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.alertCircle,
+                      size: 48, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error al cargar facturas',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _refresh,
+                    icon: const Icon(LucideIcons.refreshCw),
+                    label: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            );
+          }
+          final invoices = snapshot.data ?? [];
+          if (invoices.isEmpty) {
+            return ListView(
+              children: [
+                const SizedBox(height: 80),
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(LucideIcons.receipt,
+                          size: 48, color: Theme.of(context).colorScheme.outline),
+                      const SizedBox(height: 16),
+                      const Text('No tienes facturas aun.'),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: invoices.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) =>
+                _InvoiceCard(invoice: invoices[index]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Card individual de una factura.
+class _InvoiceCard extends StatelessWidget {
+  const _InvoiceCard({required this.invoice});
+
+  final Map<String, dynamic> invoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final number =
+        (invoice['invoiceNumber'] ?? invoice['number'] ?? '-').toString();
+    final status = (invoice['status'] ?? 'PENDING').toString();
+    final date = (invoice['date'] ?? invoice['createdAt'] ?? '').toString();
+    final amount = (invoice['amount'] is num)
+        ? (invoice['amount'] as num).toDouble()
+        : double.tryParse('${invoice['amount']}') ?? 0.0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Factura #$number',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                _StatusBadge(status: status),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (date.isNotEmpty)
+              Text(
+                date,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Monto', style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  _formatPrice(amount),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
             ),
           ],
         ),

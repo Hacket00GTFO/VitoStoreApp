@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/env.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -64,6 +65,15 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   String? _error;
   String? _orderNumber;
 
+  // Metodos de pago habilitados (cargados desde el backend).
+  Set<String> _enabledMethods = {'stripe'};
+  bool _methodsLoaded = false;
+
+  // Opciones de envio.
+  List<ShippingOption> _shippingOptions = [];
+  ShippingOption? _selectedShipping;
+  bool _loadingShipping = false;
+
   // Controllers de formulario de envio.
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
@@ -88,7 +98,53 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           _phoneController.text = user.phone!;
         }
       }
+      _loadPaymentMethods();
     });
+  }
+
+  Future<void> _loadPaymentMethods() async {
+    try {
+      final repo = ref.read(checkoutRepositoryProvider);
+      final methods = await repo.getAvailablePaymentMethods();
+      if (mounted) {
+        setState(() {
+          _enabledMethods = methods;
+          _methodsLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _methodsLoaded = true);
+    }
+  }
+
+  Future<void> _loadShippingOptions() async {
+    final zip = _zipController.text.trim();
+    if (zip.isEmpty) return;
+    setState(() => _loadingShipping = true);
+    try {
+      final repo = ref.read(checkoutRepositoryProvider);
+      final options = await repo.getShippingOptions(zipCode: zip);
+      if (mounted) {
+        setState(() {
+          _shippingOptions = options;
+          _selectedShipping = options.isNotEmpty ? options.first : null;
+          _loadingShipping = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingShipping = false);
+    }
+  }
+
+  bool _isMethodEnabled(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.stripe:
+        return _enabledMethods.contains('stripe');
+      case PaymentMethod.mercadopago:
+        return _enabledMethods.contains('mercadopago');
+      case PaymentMethod.spei:
+        return _enabledMethods.contains('spei');
+    }
   }
 
   @override
@@ -191,7 +247,37 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
               decoration: const InputDecoration(labelText: 'Codigo postal'),
               keyboardType: TextInputType.number,
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              onChanged: (v) {
+                if (v.trim().length >= 5) {
+                  _loadShippingOptions();
+                }
+              },
             ),
+            // Opciones de envio
+            if (_loadingShipping) ...[
+              const SizedBox(height: 16),
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ],
+            if (!_loadingShipping && _shippingOptions.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Metodo de envio',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 8),
+              ..._shippingOptions.map((option) => RadioListTile<ShippingOption>(
+                    value: option,
+                    groupValue: _selectedShipping,
+                    title: Text(option.name),
+                    subtitle: Text(option.estimatedDays),
+                    secondary: Text(
+                      option.cost > 0 ? _formatPrice(option.cost) : 'Gratis',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    onChanged: (v) => setState(() => _selectedShipping = v),
+                  )),
+            ],
           ],
         ),
       ),
@@ -201,30 +287,34 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   }
 
   Step _paymentStep(BuildContext context) {
-    // El backend solo tiene Stripe activo (`/api/payments/available`).
-    const enabledMethods = {PaymentMethod.stripe};
     return Step(
       title: const Text('Metodo de pago'),
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...PaymentMethod.values.map((method) {
-            final enabled = enabledMethods.contains(method);
-            return ListTile(
-              enabled: enabled,
-              leading: Icon(method.icon),
-              title: Text(method.label),
-              subtitle: enabled ? null : const Text('No disponible por el momento'),
-              trailing: Radio<PaymentMethod>(
-                value: method,
-                // ignore: deprecated_member_use
-                groupValue: _paymentMethod,
-                // ignore: deprecated_member_use
-                onChanged: enabled ? (v) => setState(() => _paymentMethod = v!) : null,
-              ),
-              onTap: enabled ? () => setState(() => _paymentMethod = method) : null,
-            );
-          }),
+          if (!_methodsLoaded)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            ...PaymentMethod.values.map((method) {
+              final enabled = _isMethodEnabled(method);
+              return ListTile(
+                enabled: enabled,
+                leading: Icon(method.icon),
+                title: Text(method.label),
+                subtitle: enabled ? null : const Text('No disponible por el momento'),
+                trailing: Radio<PaymentMethod>(
+                  value: method,
+                  // ignore: deprecated_member_use
+                  groupValue: _paymentMethod,
+                  // ignore: deprecated_member_use
+                  onChanged: enabled ? (v) => setState(() => _paymentMethod = v!) : null,
+                ),
+                onTap: enabled ? () => setState(() => _paymentMethod = method) : null,
+              );
+            }),
         ],
       ),
       isActive: _currentStep >= 1,
@@ -233,6 +323,8 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   }
 
   Step _summaryStep(BuildContext context, CartState cart) {
+    final shippingCost = _selectedShipping?.cost ?? 0;
+    final grandTotal = cart.totalAmount + shippingCost;
     return Step(
       title: const Text('Resumen y pago'),
       content: Column(
@@ -258,7 +350,12 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           const Divider(),
           _summaryRow(context, 'Subtotal', _formatPrice(cart.subtotal)),
           const SizedBox(height: 4),
-          _summaryRow(context, 'Total', _formatPrice(cart.totalAmount), isTotal: true),
+          if (_selectedShipping != null) ...[
+            _summaryRow(context, 'Envio (${_selectedShipping!.name})',
+                _selectedShipping!.cost > 0 ? _formatPrice(_selectedShipping!.cost) : 'Gratis'),
+            const SizedBox(height: 4),
+          ],
+          _summaryRow(context, 'Total', _formatPrice(grandTotal), isTotal: true),
           const SizedBox(height: 16),
           // Metodo de pago seleccionado.
           Container(
@@ -293,6 +390,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
 
   Widget _controlsBuilder(BuildContext context, ControlsDetails details) {
     final isLastStep = _currentStep == 2;
+    final cart = ref.read(cartControllerProvider);
+    final shippingCost = _selectedShipping?.cost ?? 0;
+    final grandTotal = cart.totalAmount + shippingCost;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Row(
@@ -305,7 +405,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(isLastStep ? 'Pagar ${_formatPrice(ref.read(cartControllerProvider).totalAmount)}' : 'Continuar'),
+                : Text(isLastStep ? 'Pagar ${_formatPrice(grandTotal)}' : 'Continuar'),
           ),
           if (_currentStep > 0) ...[
             const SizedBox(width: 12),
@@ -349,7 +449,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     try {
       final repo = ref.read(checkoutRepositoryProvider);
 
-      // 1. Crear la orden (el backend vacía el carrito en el servidor).
+      // 1. Crear la orden (el backend vacia el carrito en el servidor).
       final order = await repo.createOrder(
         shippingAddress: {
           'fullName': _fullNameController.text.trim(),
@@ -360,65 +460,156 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           'zip': _zipController.text.trim(),
         },
         paymentMethod: _paymentMethod.name,
+        shippingMethodId: _selectedShipping?.id,
       );
       final orderId = order['id']?.toString() ?? '';
       final orderNumber =
           order['orderNumber']?.toString() ?? orderId;
 
-      // 2. Stripe: crear PaymentIntent y presentar la hoja de pago.
-      //    Sin publishable key configurada, la orden queda PENDING y se
-      //    muestra exito con aviso de pago pendiente.
+      // 2. Procesar pago segun el metodo seleccionado.
       if (_paymentMethod == PaymentMethod.stripe &&
           Env.stripePublicKey.isNotEmpty &&
           orderId.isNotEmpty) {
-        final clientSecret = await repo.getStripePaymentIntent(orderId: orderId);
-        if (clientSecret.isEmpty) {
-          throw Exception('No se pudo iniciar el pago con Stripe');
-        }
-        await stripe.Stripe.instance.initPaymentSheet(
-          paymentSheetParameters: stripe.SetupPaymentSheetParameters(
-            paymentIntentClientSecret: clientSecret,
-            merchantDisplayName: 'VITO Technologies',
-            style: ThemeMode.system,
-          ),
-        );
-        try {
-          await stripe.Stripe.instance.presentPaymentSheet();
-        } on stripe.StripeException catch (e) {
-          // Usuario canceló la hoja de pago: la orden queda pendiente.
-          await _syncCart();
-          setState(() {
-            _isProcessing = false;
-            _error =
-                'Pago no completado. Tu orden $orderNumber quedo registrada como pendiente.';
-            if (e.error.code != stripe.FailureCode.Canceled) {
-              _error = 'Error en el pago: ${e.error.localizedMessage ?? e.error.message ?? e}';
-            }
-          });
-          return;
-        }
+        await _processStripePayment(repo, orderId, orderNumber);
+      } else if (_paymentMethod == PaymentMethod.mercadopago &&
+          orderId.isNotEmpty) {
+        await _processMercadoPagoPayment(repo, orderId, orderNumber);
+      } else if (_paymentMethod == PaymentMethod.spei &&
+          orderId.isNotEmpty) {
+        await _processSpeiPayment(repo, orderId, orderNumber);
       }
 
-      // 3. Sincronizar carrito (el backend ya lo vació) y mostrar exito.
+      // 3. Sincronizar carrito (el backend ya lo vacio) y mostrar exito.
       await _syncCart();
 
-      setState(() {
-        _isProcessing = false;
-        _orderNumber = orderNumber.isNotEmpty ? orderNumber : '--';
-      });
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _orderNumber = orderNumber.isNotEmpty ? orderNumber : '--';
+        });
+      }
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  /// Procesa pago con Stripe PaymentSheet.
+  Future<void> _processStripePayment(
+    CheckoutRepository repo, String orderId, String orderNumber) async {
+    final clientSecret = await repo.getStripePaymentIntent(orderId: orderId);
+    if (clientSecret.isEmpty) {
+      throw Exception('No se pudo iniciar el pago con Stripe');
+    }
+    await stripe.Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: stripe.SetupPaymentSheetParameters(
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: 'VITO Technologies',
+        style: ThemeMode.system,
+      ),
+    );
+    try {
+      await stripe.Stripe.instance.presentPaymentSheet();
+    } on stripe.StripeException catch (e) {
+      await _syncCart();
       setState(() {
         _isProcessing = false;
-        _error = e.toString();
+        _error =
+            'Pago no completado. Tu orden $orderNumber quedo registrada como pendiente.';
+        if (e.error.code != stripe.FailureCode.Canceled) {
+          _error = 'Error en el pago: ${e.error.localizedMessage ?? e.error.message ?? e}';
+        }
       });
+      rethrow;
     }
+  }
+
+  /// Procesa pago con MercadoPago: abre la URL de checkout en el navegador.
+  Future<void> _processMercadoPagoPayment(
+    CheckoutRepository repo, String orderId, String orderNumber) async {
+    final mpResult = await repo.getMercadoPagoPreference(orderId: orderId);
+    if (!mpResult.isValid) {
+      throw Exception('No se pudo iniciar el pago con MercadoPago');
+    }
+    // Abrir la URL de MercadoPago en el navegador del dispositivo.
+    final uri = Uri.parse(mpResult.initPoint);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      throw Exception('No se pudo abrir MercadoPago. '
+          'Tu orden $orderNumber quedo registrada como pendiente.');
+    }
+  }
+
+  /// Procesa pago con SPEI: muestra los datos bancarios para transferencia.
+  Future<void> _processSpeiPayment(
+    CheckoutRepository repo, String orderId, String orderNumber) async {
+    final spei = await repo.getSpeiPaymentData(orderId: orderId);
+    if (!spei.isValid) {
+      // El backend no tiene endpoint SPEI: la orden queda pendiente.
+      return;
+    }
+    // Mostrar dialog con los datos bancarios.
+    if (mounted) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pago por SPEI'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Realiza la transferencia con los siguientes datos:'),
+              const SizedBox(height: 16),
+              _speiDataRow('Banco', spei.bank),
+              _speiDataRow('CLABE', spei.clabe),
+              _speiDataRow('Monto', _formatPrice(spei.amount)),
+              _speiDataRow('Referencia', spei.reference),
+              _speiDataRow('Concepto', spei.concept),
+              const SizedBox(height: 12),
+              const Text(
+                'Tu orden quedara pendiente hasta que confirmemos el pago.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _speiDataRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          Expanded(child: SelectableText(value)),
+        ],
+      ),
+    );
   }
 
   Future<void> _syncCart() async {
     try {
       await ref.read(cartControllerProvider.notifier).load();
     } catch (_) {
-      // El carrito ya se vació en el servidor; un error de red aquí no es crítico.
+      // El carrito ya se vaci en el servidor; un error de red aqu no es crtico.
     }
   }
 

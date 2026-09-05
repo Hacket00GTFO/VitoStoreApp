@@ -71,6 +71,24 @@ class AuthController extends Notifier<AuthState> {
         );
         return;
       } catch (_) {
+        // El access token puede haber expirado: intentar refresh.
+        try {
+          final result = await _repo.refresh(refreshToken: refresh);
+          if (result != null) {
+            await storage.saveTokens(
+              accessToken: result.accessToken,
+              refreshToken: result.refreshToken,
+            );
+            final user = await _repo.me();
+            state = AuthState(
+              user: user,
+              accessToken: result.accessToken,
+              refreshToken: result.refreshToken,
+              status: AuthStatus.authenticated,
+            );
+            return;
+          }
+        } catch (_) {}
         await storage.clearTokens();
       }
     }
@@ -127,6 +145,11 @@ class AuthController extends Notifier<AuthState> {
     } catch (e) {
       state = AuthState(status: AuthStatus.error, error: e.toString());
     }
+  }
+
+  /// Actualiza el usuario en el estado (tras editar perfil).
+  void updateUser(User user) {
+    state = state.copyWith(user: user, status: AuthStatus.authenticated);
   }
 
   Future<void> logout() async {

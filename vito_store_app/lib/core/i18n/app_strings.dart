@@ -1,6 +1,10 @@
 /// Sistema de localizacion simple (sin ARB, para evitar conflictos con OneDrive).
 ///
 /// Replica del i18n de la web. Soporta es/en. Se expande en Fase 8.
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../shared/providers/providers.dart';
+
 class AppStrings {
   AppStrings._();
 
@@ -248,4 +252,12 @@ class AppStrings {
 
   /// Mapa completo para un locale.
   static Map<String, String> all(String locale) => locale == 'en' ? _en : _es;
+}
+
+/// Extension sobre [WidgetRef] para acceder facilmente a las traducciones.
+extension AppStringsRef on WidgetRef {
+  String tr(String key) {
+    final locale = watch(languageProvider);
+    return AppStrings.get(key, locale);
+  }
 }

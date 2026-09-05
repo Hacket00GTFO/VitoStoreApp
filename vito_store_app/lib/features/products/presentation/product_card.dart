@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../favorites/presentation/favorites_controller.dart';
 import '../domain/product.dart';
@@ -52,83 +52,87 @@ class ProductCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _goToDetail(context),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _ProductImage(
-                    image: _image,
-                    heroTag: heroTag ?? 'product-${product.id}',
+        child: Semantics(
+          label: '${product.name}, ${_formatPrice()}',
+          button: true,
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _ProductImage(
+                      image: _image,
+                      heroTag: heroTag ?? 'product-${product.id}',
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      if (product.price != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          _formatPrice(),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                          product.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                    ],
+                        const SizedBox(height: 4),
+                        if (product.price != null)
+                          Text(
+                            _formatPrice(),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            if (discount != null)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    discount,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                ],
+              ),
+              if (discount != null)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      discount,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            Positioned(
-              top: 0,
-              right: 0,
-              child: SizedBox(
-                width: 48,
-                height: 48,
-                child: IconButton(
-                  icon: Icon(
-                    isFav ? LucideIcons.heart : LucideIcons.heart,
-                    color: isFav
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                    fill: isFav ? 1.0 : 0.0,
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: IconButton(
+                    icon: Icon(
+                      isFav ? LucideIcons.heart : LucideIcons.heart,
+                      color: isFav
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      fill: isFav ? 1.0 : 0.0,
+                    ),
+                    tooltip: isFav ? 'Quitar de favoritos' : 'Agregar a favoritos',
+                    onPressed: () =>
+                        ref.read(favoritesProvider.notifier).toggle(product.id),
                   ),
-                  tooltip: isFav ? 'Quitar de favoritos' : 'Agregar a favoritos',
-                  onPressed: () =>
-                      ref.read(favoritesProvider.notifier).toggle(product.id),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -146,7 +150,6 @@ class _ProductImage extends StatelessWidget {
     final url = (image != null && image!.isNotEmpty) ? image : null;
     Widget content;
     if (url == null) {
-      debugPrint('[ProductCard] Sin URL de imagen (image=null)');
       content = Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
@@ -154,7 +157,6 @@ class _ProductImage extends StatelessWidget {
         ),
       );
     } else {
-      debugPrint('[ProductCard] Cargando imagen: $url');
       content = CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
@@ -164,37 +166,12 @@ class _ProductImage extends StatelessWidget {
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
-        errorWidget: (context, url, error) {
-          debugPrint('[ProductCard] ERROR cargando imagen: $url -- $error');
-          return Container(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(LucideIcons.imageOff, size: 20),
-                  const SizedBox(height: 4),
-                  Text(
-                    'URL:\n$url',
-                    style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Error: $error',
-                    style: const TextStyle(fontSize: 7),
-                    textAlign: TextAlign.center,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+        errorWidget: (context, url, error) => Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: const Center(
+            child: Icon(LucideIcons.imageOff, size: 32),
+          ),
+        ),
       );
     }
     return Hero(

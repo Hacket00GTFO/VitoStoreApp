@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/i18n/app_strings.dart';
 import '../../../shared/widgets/state_view.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../products/data/category_repository.dart';
@@ -57,15 +58,15 @@ class _StorePageState extends ConsumerState<StorePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tienda'),
+        title: Text(ref.tr('store')),
         actions: [
           IconButton(
-            tooltip: 'Filtros',
+            tooltip: ref.tr('filters'),
             icon: const Icon(LucideIcons.slidersHorizontal),
             onPressed: _openFilters,
           ),
           IconButton(
-            tooltip: 'Carrito',
+            tooltip: ref.tr('cart'),
             icon: Badge(
               isLabelVisible: cartCount > 0,
               label: Text('$cartCount'),
@@ -74,7 +75,7 @@ class _StorePageState extends ConsumerState<StorePage> {
             onPressed: () => context.push('/carrito'),
           ),
           IconButton(
-            tooltip: 'Favoritos',
+            tooltip: ref.tr('favorites'),
             icon: const Icon(LucideIcons.heart),
             onPressed: () => context.push('/favoritos'),
           ),
@@ -89,11 +90,11 @@ class _StorePageState extends ConsumerState<StorePage> {
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _submitSearch(),
               decoration: InputDecoration(
-                hintText: 'Buscar productos...',
+                hintText: '${ref.tr('search')} productos...',
                 prefixIcon: const Icon(LucideIcons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        tooltip: 'Limpiar',
+                        tooltip: ref.tr('clearFilters'),
                         icon: const Icon(LucideIcons.x),
                         onPressed: () {
                           _searchController.clear();
@@ -125,7 +126,7 @@ class _StorePageState extends ConsumerState<StorePage> {
                             message:
                                 'No se encontraron productos para tu busqueda',
                             icon: LucideIcons.search,
-                            actionLabel: 'Reintentar',
+                            actionLabel: ref.tr('retry'),
                             onAction: () =>
                                 ref.read(storeCatalogProvider.notifier).refresh(),
                           )
@@ -221,7 +222,7 @@ class _StoreFiltersSheet extends ConsumerWidget {
               children: [
                 const Icon(LucideIcons.slidersHorizontal),
                 const SizedBox(width: 8),
-                Text('Filtros', style: Theme.of(context).textTheme.titleLarge),
+                Text(ref.tr('filters'), style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
                 TextButton(
                   onPressed: () {
@@ -229,12 +230,12 @@ class _StoreFiltersSheet extends ConsumerWidget {
                     ref.read(storeCatalogProvider.notifier).setSort(null);
                     Navigator.pop(context);
                   },
-                  child: const Text('Limpiar'),
+                  child: Text(ref.tr('clearFilters')),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text('Categoria',
+            Text(ref.tr('category'),
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             categoriesAsync.when(
@@ -272,7 +273,7 @@ class _StoreFiltersSheet extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodySmall),
             ),
             const SizedBox(height: 16),
-            Text('Ordenar por', style: Theme.of(context).textTheme.titleMedium),
+            Text(ref.tr('sortBy'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,

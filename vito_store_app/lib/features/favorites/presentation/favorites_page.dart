@@ -1,16 +1,17 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/i18n/app_strings.dart';
 import '../../../shared/widgets/state_view.dart';
 import '../../products/presentation/product_card.dart';
 import 'favorites_controller.dart';
 
 /// Pagina de Favoritos (Wishlist).
 ///
-/// Grid de productos favoritos con estado vacio. Por ahora usa un provider
-/// en memoria ([favoritesProvider]); la sincronizacion con backend es Fase 4+.
+/// Grid de productos favoritos con estado vacio. Sincroniza con el backend
+/// via [FavoritesRepository] cuando el usuario esta autenticado.
 class FavoritesPage extends ConsumerWidget {
   const FavoritesPage({super.key});
 
@@ -20,10 +21,10 @@ class FavoritesPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Favoritos'),
+        title: Text(ref.tr('favorites')),
         actions: [
           IconButton(
-            tooltip: 'Tienda',
+            tooltip: ref.tr('store'),
             icon: const Icon(LucideIcons.shoppingBag),
             onPressed: () => context.push('/tienda'),
           ),
@@ -32,14 +33,17 @@ class FavoritesPage extends ConsumerWidget {
       body: StateView(
         asyncValue: favoritesAsync,
         emptyMessage:
-            'Aun no tienes favoritos.\nToca el corazon en un producto para guardarlo aqui.',
+            '${ref.tr('emptyFavorites')}\nToca el corazon en un producto para guardarlo aqui.',
         emptyIcon: LucideIcons.heart,
         emptyActionLabel: 'Explorar tienda',
         emptyAction: () => context.push('/tienda'),
         onRetry: () => ref.invalidate(favoriteProductsProvider),
         builder: (products) {
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(favoriteProductsProvider),
+            onRefresh: () async {
+              await ref.read(favoritesProvider.notifier).refresh();
+              ref.invalidate(favoriteProductsProvider);
+            },
             child: GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(12),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/chatbot/presentation/chatbot_sheet.dart';
 
@@ -37,10 +37,14 @@ class MainShell extends StatelessWidget {
     final index = _currentIndex(context);
     return Scaffold(
       body: child,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => ChatbotSheet.show(context),
-        tooltip: 'Asistente VITO',
-        child: const Icon(LucideIcons.messageCircle),
+      floatingActionButton: Semantics(
+        label: 'Asistente VITO',
+        button: true,
+        child: FloatingActionButton(
+          onPressed: () => ChatbotSheet.show(context),
+          tooltip: 'Asistente VITO',
+          child: const Icon(LucideIcons.messageCircle),
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,

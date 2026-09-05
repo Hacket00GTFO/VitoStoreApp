@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../core/i18n/app_strings.dart';
 import '../../../shared/widgets/state_view.dart';
 import '../data/service_repository.dart';
 import '../domain/service.dart';
@@ -40,12 +41,12 @@ class ServicesPage extends ConsumerWidget {
     final servicesAsync = ref.watch(servicesListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Servicios')),
+      appBar: AppBar(title: Text(ref.tr('services'))),
       body: StateView(
         asyncValue: servicesAsync,
         emptyMessage: 'No hay servicios disponibles por el momento.',
         emptyIcon: LucideIcons.wrench,
-        emptyActionLabel: 'Reintentar',
+        emptyActionLabel: ref.tr('retry'),
         emptyAction: () => ref.invalidate(servicesListProvider),
         onRetry: () => ref.invalidate(servicesListProvider),
         builder: (services) {
