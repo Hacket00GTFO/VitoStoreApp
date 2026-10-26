@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" role="img" aria-labelledby="title desc">
+  <title id="title">Diagrama de navegación de VitoStoreApp</title>
+  <desc id="desc">El menú principal contiene Inicio, Tienda, Cuenta y Favoritos. El recorrido de compra pasa por catálogo, detalle, carrito, checkout y confirmación. Servicios conduce a Contacto. Blog y Notificaciones son rutas secundarias. Checkout, Cuenta y Notificaciones redirigen a Login si no hay sesión y vuelven al destino solicitado.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0F172A; }
+      .section { font-size: 20px; font-weight: 700; letter-spacing: 1.5px; fill: #004499; }
+      .title { font-size: 25px; font-weight: 700; }
+      .route { font-size: 18px; fill: #475569; }
+      .route-small { font-size: 16px; fill: #475569; }
+      .detail { font-size: 18px; fill: #334155; }
+      .flag { font-size: 16px; font-weight: 700; fill: #004499; }
+      .footer { font-size: 17px; fill: #475569; }
+    </style>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9.5" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1 L10 5.5 L1 10 Z" fill="#0066CC"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="780" fill="#FFFFFF"/>
+
+  <text x="26" y="39" class="section">MENÚ PRINCIPAL · MainShell</text>
+  <rect x="25" y="57" width="1150" height="133" rx="16" fill="#EAF4FF" stroke="#BFDBFE" stroke-width="2"/>
+  <g fill="#FFFFFF" stroke="#0066CC" stroke-width="2.5">
+    <rect x="44" y="76" width="265" height="95" rx="13"/>
+    <rect x="326" y="76" width="265" height="95" rx="13"/>
+    <rect x="608" y="76" width="265" height="95" rx="13"/>
+    <rect x="890" y="76" width="265" height="95" rx="13"/>
+  </g>
+  <text x="65" y="113" class="title">Inicio</text>
+  <text x="65" y="145" class="route">/</text>
+  <text x="347" y="113" class="title">Tienda</text>
+  <text x="347" y="145" class="route">/tienda</text>
+  <text x="629" y="113" class="title">Cuenta</text>
+  <text x="629" y="143" class="route-small">/mis-transacciones</text>
+  <text x="629" y="165" class="flag">Requiere sesión</text>
+  <text x="911" y="113" class="title">Favoritos</text>
+  <text x="911" y="145" class="route">/favoritos</text>
+
+  <text x="26" y="229" class="section">RECORRIDO DE COMPRA</text>
+  <g stroke="#0066CC" stroke-width="4" fill="none" marker-end="url(#arrow)">
+    <path d="M193 302 L213 302"/>
+    <path d="M385 302 L405 302"/>
+    <path d="M577 302 L597 302"/>
+    <path d="M769 302 L789 302"/>
+    <path d="M961 302 L981 302"/>
+  </g>
+  <g fill="#F1F5F9" stroke="#64748B" stroke-width="2.5">
+    <rect x="24" y="247" width="169" height="119" rx="13"/>
+    <rect x="216" y="247" width="169" height="119" rx="13"/>
+    <rect x="408" y="247" width="169" height="119" rx="13"/>
+    <rect x="600" y="247" width="169" height="119" rx="13"/>
+  </g>
+  <rect x="792" y="247" width="169" height="119" rx="13" fill="#EAF4FF" stroke="#0066CC" stroke-width="2.5"/>
+  <rect x="984" y="247" width="192" height="119" rx="13" fill="#EAF4FF" stroke="#0066CC" stroke-width="2.5"/>
+  <text x="42" y="288" class="title">Entrada</text>
+  <text x="42" y="317" class="route-small">Inicio / o menú</text>
+  <text x="42" y="340" class="route-small">Tienda</text>
+  <text x="234" y="288" class="title">Listado</text>
+  <text x="234" y="317" class="route-small">/tienda o</text>
+  <text x="234" y="340" class="route-small">/productos</text>
+  <text x="426" y="288" class="title">Detalle</text>
+  <text x="426" y="317" class="route-small">/productos/</text>
+  <text x="426" y="340" class="route-small">:category/:id</text>
+  <text x="618" y="288" class="title">Carrito</text>
+  <text x="618" y="321" class="route">/carrito</text>
+  <text x="810" y="288" class="title">Checkout</text>
+  <text x="810" y="320" class="route">/checkout</text>
+  <text x="810" y="344" class="flag">Requiere sesión</text>
+  <text x="1002" y="288" class="title">Confirmación</text>
+  <text x="1002" y="319" class="route-small">/checkout/</text>
+  <text x="1002" y="342" class="route-small">success</text>
+
+  <text x="26" y="407" class="section">SERVICIOS Y RUTAS SECUNDARIAS</text>
+  <path d="M279 479 L329 479" stroke="#0066CC" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <g fill="#F1F5F9" stroke="#64748B" stroke-width="2.5">
+    <rect x="25" y="426" width="254" height="112" rx="13"/>
+    <rect x="332" y="426" width="345" height="112" rx="13"/>
+    <rect x="710" y="426" width="194" height="112" rx="13"/>
+    <rect x="934" y="426" width="242" height="112" rx="13"/>
+  </g>
+  <text x="45" y="469" class="title">Servicios</text>
+  <text x="45" y="501" class="route">/servicios</text>
+  <text x="352" y="469" class="title">Contacto</text>
+  <text x="352" y="498" class="route-small">/contacto?subject=...</text>
+  <text x="352" y="521" class="route-small">Asunto precargado</text>
+  <text x="730" y="469" class="title">Blog</text>
+  <text x="730" y="501" class="route">/blog</text>
+  <text x="954" y="467" class="title">Notificaciones</text>
+  <text x="954" y="496" class="route-small">/notificaciones</text>
+  <text x="954" y="521" class="flag">Requiere sesión</text>
+
+  <text x="26" y="580" class="section">GUARDIA DE AUTENTICACIÓN</text>
+  <g stroke="#0066CC" stroke-width="4" fill="none" marker-end="url(#arrow)">
+    <path d="M476 653 L522 653"/>
+    <path d="M809 653 L855 653"/>
+  </g>
+  <rect x="25" y="599" width="451" height="112" rx="13" fill="#EAF4FF" stroke="#0066CC" stroke-width="2.5"/>
+  <rect x="525" y="599" width="284" height="112" rx="13" fill="#F1F5F9" stroke="#64748B" stroke-width="2.5"/>
+  <rect x="858" y="599" width="318" height="112" rx="13" fill="#EAF4FF" stroke="#0066CC" stroke-width="2.5"/>
+  <text x="45" y="639" class="title">Ruta protegida sin sesión</text>
+  <text x="45" y="670" class="route-small">Checkout · Cuenta · Notificaciones</text>
+  <text x="545" y="639" class="title">Iniciar sesión</text>
+  <text x="545" y="670" class="route-small">/login?redirect=...</text>
+  <text x="878" y="639" class="title">Volver al destino</text>
+  <text x="878" y="670" class="route-small">tras autenticar</text>
+
+  <text x="25" y="752" class="footer">Rutas provisionales en el código: /nosotros, /historial y /seguimiento.</text>
+</svg>

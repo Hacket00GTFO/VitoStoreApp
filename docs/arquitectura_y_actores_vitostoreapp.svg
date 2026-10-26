@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Arquitectura y actores de VitoStoreApp</title>
+  <desc id="desc">Los clientes potenciales y registrados usan la App Flutter o la web desingVITO. Ambos clientes consumen la API REST compartida Express y Prisma, que consulta PostgreSQL vito_db y se integra con servicios de pago. El personal y los directivos de VITO definen y validan el proyecto.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #0F172A; }
+      .eyebrow { font-size: 20px; font-weight: 700; letter-spacing: 1.8px; fill: #004499; }
+      .actor-title { font-size: 23px; font-weight: 700; }
+      .actor-copy { font-size: 18px; fill: #475569; }
+      .node-title { font-size: 25px; font-weight: 700; }
+      .node-copy { font-size: 19px; fill: #334155; }
+      .line-label { font-size: 17px; font-weight: 700; fill: #004499; }
+      .note { font-size: 17px; fill: #475569; }
+    </style>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9.5" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M1 1 L10 5.5 L1 10 Z" fill="#0066CC"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="680" fill="#FFFFFF"/>
+  <text x="30" y="37" class="eyebrow">ACTORES DEL PROYECTO</text>
+
+  <g fill="#F1F5F9" stroke="#BFDBFE" stroke-width="2">
+    <rect x="30" y="58" width="270" height="146" rx="14"/>
+    <rect x="320" y="58" width="270" height="146" rx="14"/>
+    <rect x="610" y="58" width="270" height="146" rx="14"/>
+    <rect x="900" y="58" width="270" height="146" rx="14"/>
+  </g>
+  <text x="50" y="99" class="actor-title">Cliente potencial</text>
+  <text x="50" y="135" class="actor-copy">Explora catálogo,</text>
+  <text x="50" y="162" class="actor-copy">servicios y contacto.</text>
+  <text x="340" y="99" class="actor-title">Cliente con cuenta</text>
+  <text x="340" y="135" class="actor-copy">Compra y consulta</text>
+  <text x="340" y="162" class="actor-copy">pedidos y perfil.</text>
+  <text x="630" y="99" class="actor-title">Personal VITO</text>
+  <text x="630" y="135" class="actor-copy">Ventas y servicio</text>
+  <text x="630" y="162" class="actor-copy">definen procesos.</text>
+  <text x="920" y="99" class="actor-title">Directivos VITO</text>
+  <text x="920" y="135" class="actor-copy">Priorizan y validan</text>
+  <text x="920" y="162" class="actor-copy">los entregables.</text>
+
+  <line x1="30" y1="229" x2="1170" y2="229" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="30" y="263" class="eyebrow">ARQUITECTURA DE LA SOLUCIÓN</text>
+
+  <g stroke="#0066CC" stroke-width="4" fill="none" marker-end="url(#arrow)">
+    <path d="M333 365 L424 410"/>
+    <path d="M333 526 L424 473"/>
+    <path d="M771 400 L866 373"/>
+    <path d="M771 470 L866 529"/>
+  </g>
+
+  <rect x="30" y="302" width="303" height="126" rx="16" fill="#EAF4FF" stroke="#0066CC" stroke-width="3"/>
+  <text x="52" y="343" class="node-title">VitoStoreApp</text>
+  <text x="52" y="373" class="node-copy">Flutter para iOS y Android</text>
+  <text x="52" y="401" class="node-copy">Riverpod · Dio · go_router</text>
+
+  <rect x="30" y="467" width="303" height="118" rx="16" fill="#F1F5F9" stroke="#64748B" stroke-width="2.5"/>
+  <text x="52" y="508" class="node-title">desingVITO</text>
+  <text x="52" y="538" class="node-copy">Comercio electrónico web</text>
+  <text x="52" y="565" class="node-copy">Misma API y datos</text>
+
+  <rect x="424" y="345" width="347" height="174" rx="16" fill="#0066CC" stroke="#004499" stroke-width="3"/>
+  <text x="448" y="389" class="node-title" fill="#FFFFFF" style="fill:#FFFFFF">API REST compartida</text>
+  <text x="448" y="423" class="node-copy" fill="#FFFFFF" style="fill:#FFFFFF">Express + Prisma</text>
+  <text x="448" y="456" class="node-copy" fill="#FFFFFF" style="fill:#FFFFFF">Auth · catálogo · carrito</text>
+  <text x="448" y="489" class="node-copy" fill="#FFFFFF" style="fill:#FFFFFF">Pedidos · servicios · pagos</text>
+
+  <rect x="866" y="318" width="304" height="116" rx="16" fill="#EAF4FF" stroke="#0066CC" stroke-width="3"/>
+  <text x="889" y="361" class="node-title">PostgreSQL</text>
+  <text x="889" y="394" class="node-copy">vito_db compartida</text>
+
+  <rect x="866" y="482" width="304" height="112" rx="16" fill="#F1F5F9" stroke="#64748B" stroke-width="2.5"/>
+  <text x="889" y="523" class="node-title">Servicios de pago</text>
+  <text x="889" y="556" class="node-copy">Stripe · Mercado Pago</text>
+  <text x="889" y="581" class="node-copy">y SPEI</text>
+
+  <text x="30" y="635" class="note">Los clientes usan la App o la web; el personal y los directivos participan en la definición y aceptación.</text>
+  <text x="30" y="661" class="note">Ambos canales comparten API y base de datos; la App no almacena una base propia.</text>
+</svg>
