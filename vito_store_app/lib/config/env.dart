@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Variables de entorno inyectadas vía `--dart-define`.
 ///
 /// Equivalente a las variables `VITE_*` de la web (sección 12 del plan).
@@ -13,13 +15,22 @@ class Env {
 
   /// URL base del backend (sin /api).
   ///
-  /// En Android emulado, Docker expone el host en 10.0.2.2. En iOS Simulator o
-  /// desktop se usa localhost. Si necesitas forzar otra URL, puedes pasar
-  /// `--dart-define=API_URL=http://host.docker.internal:3001` o la IP del host.
+  /// - En Android emulado, Docker expone el host en 10.0.2.2.
+  /// - En iOS Simulator o desktop se usa localhost.
+  /// - En Flutter Web se sirve la app desde el MISMO origen que el proxy
+  ///   (`/api` lo reenvía nginx → vito-api), así que el origen es el del
+  ///   navegador (incluye el host del túnel o el dominio de producción).
+  ///   Si se sirve en otro host (p.ej. `flutter run -d chrome` sin proxy),
+  ///   inyectar `--dart-define=API_URL=http://127.0.0.1:3001`.
   static String get apiBaseUrl {
     const override = String.fromEnvironment('API_URL');
     if (override.isNotEmpty) {
       return override;
+    }
+
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      return origin.isEmpty ? 'http://localhost:3001' : origin;
     }
 
     if (Platform.isAndroid) {

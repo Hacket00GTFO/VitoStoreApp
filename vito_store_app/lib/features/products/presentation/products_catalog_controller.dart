@@ -12,6 +12,7 @@ class ProductsCatalogState {
     this.sort,
     this.limit = 20,
     this.offset = 0,
+    this.total = 0,
     this.hasReachedMax = false,
     this.isLoadingMore = false,
     this.error,
@@ -24,6 +25,8 @@ class ProductsCatalogState {
   final String? sort;
   final int limit;
   final int offset;
+  /// Total de resultados del filtro actual (informado por el backend).
+  final int total;
   final bool hasReachedMax;
   final bool isLoadingMore;
   final String? error;
@@ -36,19 +39,24 @@ class ProductsCatalogState {
     String? sort,
     int? limit,
     int? offset,
+    int? total,
     bool? hasReachedMax,
     bool? isLoadingMore,
     String? error,
     bool? initialLoading,
     bool clearError = false,
+    bool clearCategory = false,
+    bool clearSearch = false,
+    bool clearSort = false,
   }) {
     return ProductsCatalogState(
       items: items ?? this.items,
-      category: category ?? this.category,
-      search: search ?? this.search,
-      sort: sort ?? this.sort,
+      category: clearCategory ? null : (category ?? this.category),
+      search: clearSearch ? null : (search ?? this.search),
+      sort: clearSort ? null : (sort ?? this.sort),
       limit: limit ?? this.limit,
       offset: offset ?? this.offset,
+      total: total ?? this.total,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: clearError ? null : (error ?? this.error),
@@ -76,21 +84,22 @@ base mixin CatalogLogic on Notifier<ProductsCatalogState> {
       clearError: true,
     );
     try {
-      final items = await repo.list(
-        category: state.category,
+      final (:products, :total) = await repo.list(
+        categoryId: state.category,
         search: state.search,
         sort: state.sort,
         limit: state.limit,
         offset: 0,
       );
       state = ProductsCatalogState(
-        items: items,
+        items: products,
         category: state.category,
         search: state.search,
         sort: state.sort,
         limit: state.limit,
-        offset: items.length,
-        hasReachedMax: items.length < state.limit,
+        offset: products.length,
+        total: total,
+        hasReachedMax: products.isEmpty || products.length >= total,
         initialLoading: false,
       );
     } catch (e) {
@@ -106,17 +115,18 @@ base mixin CatalogLogic on Notifier<ProductsCatalogState> {
     if (state.hasReachedMax || state.isLoadingMore) return;
     state = state.copyWith(isLoadingMore: true, clearError: true);
     try {
-      final items = await repo.list(
-        category: state.category,
+      final (:products, :total) = await repo.list(
+        categoryId: state.category,
         search: state.search,
         sort: state.sort,
         limit: state.limit,
         offset: state.offset,
       );
       state = state.copyWith(
-        items: [...state.items, ...items],
-        offset: state.offset + items.length,
-        hasReachedMax: items.length < state.limit,
+        items: [...state.items, ...products],
+        offset: state.offset + products.length,
+        total: total,
+        hasReachedMax: products.isEmpty || state.items.length + products.length >= total,
         isLoadingMore: false,
       );
     } catch (e) {
@@ -126,7 +136,7 @@ base mixin CatalogLogic on Notifier<ProductsCatalogState> {
 
   void setCategory(String? category) {
     if (category == state.category) return;
-    state = state.copyWith(category: category, items: const [], offset: 0);
+    state = state.copyWith(clearCategory: true, category: category, items: const [], offset: 0);
     refresh();
   }
 
@@ -139,7 +149,7 @@ base mixin CatalogLogic on Notifier<ProductsCatalogState> {
 
   void setSort(String? sort) {
     if (sort == state.sort) return;
-    state = state.copyWith(sort: sort, items: const [], offset: 0);
+    state = state.copyWith(clearSort: true, sort: sort, items: const [], offset: 0);
     refresh();
   }
 }

@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/blog_repository.dart';
 import '../domain/blog_post.dart';
 
-/// Vista de detalle de un post del blog.
+/// Vista de detalle de un post del blog ya cargado (desde el listado).
 /// Muestra imagen hero, titulo, autor, fecha, contenido HTML y enlace a PDF.
 class BlogPostPage extends StatelessWidget {
   const BlogPostPage({required this.post, super.key});
@@ -141,6 +143,47 @@ class BlogPostPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Detalle por SLUG, habilitando la ruta navegable `/blog/:slug`.
+/// Es la entrada requerida por deep links (`vitoapp:///blog/<slug>`) y por
+/// compartir posts: consulta `GET /blog/posts/:slug` (incrementa views y
+/// trae `relatedPosts`) y renderiza la misma vista que [BlogPostPage].
+class BlogPostBySlugPage extends ConsumerWidget {
+  const BlogPostBySlugPage({required this.slug, super.key});
+
+  final String slug;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailAsync = ref.watch(blogPostDetailProvider(slug));
+    return detailAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(title: const Text('Articulo')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.newspaper,
+                  size: 48, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 16),
+              const Text('No se pudo conectar con el servidor.'),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () => ref.invalidate(blogPostDetailProvider(slug)),
+                icon: const Icon(LucideIcons.refreshCw),
+                label: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (detail) => BlogPostPage(post: detail.post),
     );
   }
 }

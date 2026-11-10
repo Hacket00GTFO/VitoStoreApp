@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -91,9 +92,24 @@ class _ContactPageState extends ConsumerState<ContactPage> {
       }
     } catch (e) {
       if (!mounted) return;
+      String message = 'Error: $e';
+      if (e is DioException) {
+        // El backend responde 400 con el detalle Joi (`{error:"Body validation failed: ...",details:[...]}`)
+        // y 429 (publicQuota: 5 mensajes / 15 min por IP).
+        final data = e.response?.data;
+        final backendError = data is Map<String, dynamic>
+            ? (data['error']?.toString())
+            : null;
+        if (e.response?.statusCode == 429) {
+          message = 'Demasiados mensajes enviados desde esta red. '
+              'Espera unos minutos e intenta de nuevo.';
+        } else if (backendError != null && backendError.isNotEmpty) {
+          message = backendError;
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(message),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -102,8 +118,10 @@ class _ContactPageState extends ConsumerState<ContactPage> {
     }
   }
 
-  String? _required(String? value, String field) {
-    if (value == null || value.trim().isEmpty) return '$field es obligatorio';
+  String? _validateName(String? value) {
+    // Schema del backend: name min 2 max 100.
+    if (value == null || value.trim().isEmpty) return 'El nombre es obligatorio';
+    if (value.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
     return null;
   }
 
@@ -111,6 +129,22 @@ class _ContactPageState extends ConsumerState<ContactPage> {
     if (value == null || value.trim().isEmpty) return 'El correo es obligatorio';
     final regex = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
     if (!regex.hasMatch(value.trim())) return 'Ingresa un correo valido';
+    return null;
+  }
+
+  String? _validateSubject(String? value) {
+    // Schema del backend: subject min 5 max 200 (si no, responde 400).
+    if (value == null || value.trim().isEmpty) return 'El asunto es obligatorio';
+    if (value.trim().length < 5) return 'El asunto debe tener al menos 5 caracteres';
+    if (value.trim().length > 200) return 'El asunto debe tener 200 caracteres o menos';
+    return null;
+  }
+
+  String? _validateMessage(String? value) {
+    // Schema del backend: message min 10 max 5000 (si no, responde 400).
+    if (value == null || value.trim().isEmpty) return 'El mensaje es obligatorio';
+    if (value.trim().length < 10) return 'El mensaje debe tener al menos 10 caracteres';
+    if (value.trim().length > 5000) return 'El mensaje debe tener 5000 caracteres o menos';
     return null;
   }
 
@@ -138,7 +172,7 @@ class _ContactPageState extends ConsumerState<ContactPage> {
                       prefixIcon: Icon(LucideIcons.user),
                       border: OutlineInputBorder(),
                     ),
-                    validator: (v) => _required(v, 'El nombre'),
+                    validator: _validateName,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
@@ -172,7 +206,7 @@ class _ContactPageState extends ConsumerState<ContactPage> {
                       prefixIcon: Icon(LucideIcons.tag),
                       border: OutlineInputBorder(),
                     ),
-                    validator: (v) => _required(v, 'El asunto'),
+                    validator: _validateSubject,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
@@ -185,7 +219,8 @@ class _ContactPageState extends ConsumerState<ContactPage> {
                       alignLabelWithHint: true,
                     ),
                     maxLines: 5,
-                    validator: (v) => _required(v, 'El mensaje'),
+                    maxLength: 5000,
+                    validator: _validateMessage,
                   ),
                   const SizedBox(height: 20),
                   FilledButton.icon(

@@ -1,6 +1,8 @@
 /// Sistema de localizacion simple (sin ARB, para evitar conflictos con OneDrive).
 ///
 /// Replica del i18n de la web. Soporta es/en. Se expande en Fase 8.
+library;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/providers/providers.dart';

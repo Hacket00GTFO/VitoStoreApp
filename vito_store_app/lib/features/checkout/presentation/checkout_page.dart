@@ -1,9 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/env.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -66,19 +66,26 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   String? _orderNumber;
 
   // Metodos de pago habilitados (cargados desde el backend).
-  Set<String> _enabledMethods = {'stripe'};
+  PaymentMethodsAvailability _availableMethods =
+      const PaymentMethodsAvailability(stripe: true);
   bool _methodsLoaded = false;
 
-  // Opciones de envio.
+  // Opciones de envio (cotizacion real del backend).
   List<ShippingOption> _shippingOptions = [];
   ShippingOption? _selectedShipping;
   bool _loadingShipping = false;
+  String? _shippingError;
 
-  // Controllers de formulario de envio.
+  // Controllers del formulario de envio (campos estructurados que exige el
+  // backend: recipient, phone, street, exteriorNumber, interiorNumber?,
+  // neighborhood, city, state, postalCode).
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _exteriorController = TextEditingController();
+  final _interiorController = TextEditingController();
+  final _neighborhoodController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _zipController = TextEditingController();
@@ -105,10 +112,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   Future<void> _loadPaymentMethods() async {
     try {
       final repo = ref.read(checkoutRepositoryProvider);
-      final methods = await repo.getAvailablePaymentMethods();
+      final availability = await repo.getAvailablePaymentMethods();
       if (mounted) {
         setState(() {
-          _enabledMethods = methods;
+          _availableMethods = availability;
           _methodsLoaded = true;
         });
       }
@@ -117,33 +124,87 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     }
   }
 
-  Future<void> _loadShippingOptions() async {
+  /// Direccion estructurada completa para la cotizacion/orden, o null si
+  /// faltan campos obligatorios (evita peticiones inutiles).
+  ShippingDetails? get _shippingDetails {
+    final recipient = _fullNameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final street = _streetController.text.trim();
+    final exterior = _exteriorController.text.trim();
+    final neighborhood = _neighborhoodController.text.trim();
+    final city = _cityController.text.trim();
+    final state = _stateController.text.trim();
     final zip = _zipController.text.trim();
-    if (zip.isEmpty) return;
-    setState(() => _loadingShipping = true);
+    if (recipient.isEmpty ||
+        phone.isEmpty ||
+        street.isEmpty ||
+        exterior.isEmpty ||
+        neighborhood.isEmpty ||
+        city.isEmpty ||
+        state.isEmpty ||
+        zip.isEmpty) {
+      return null;
+    }
+    return ShippingDetails(
+      recipient: recipient,
+      phone: phone,
+      street: street,
+      exteriorNumber: exterior,
+      interiorNumber: _interiorController.text.trim(),
+      neighborhood: neighborhood,
+      city: city,
+      state: state,
+      postalCode: zip,
+    );
+  }
+
+  Future<void> _loadShippingOptions() async {
+    final details = _shippingDetails;
+    if (details == null) return;
+    setState(() {
+      _loadingShipping = true;
+      _shippingError = null;
+    });
     try {
       final repo = ref.read(checkoutRepositoryProvider);
-      final options = await repo.getShippingOptions(zipCode: zip);
+      final result = await repo.getShippingOptions(shippingDetails: details);
       if (mounted) {
         setState(() {
-          _shippingOptions = options;
-          _selectedShipping = options.isNotEmpty ? options.first : null;
+          _shippingOptions = result.options;
+          _selectedShipping =
+              result.options.isNotEmpty ? result.options.first : null;
           _loadingShipping = false;
+          _shippingError = result.options.isEmpty
+              ? 'No hay servicios de envio disponibles para esta zona. '
+                  'Reintenta con otra direccion o contacta a soporte.'
+              : null;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingShipping = false);
+    } catch (e) {
+      if (mounted) {
+        final msg = e is DioException
+            ? (e.response?.data is Map<String, dynamic>
+                    ? (e.response!.data['error']?.toString() ??
+                        'No se pudo cotizar el envio')
+                    : 'No se pudo cotizar el envio')
+            : 'No se pudo cotizar el envio. Revisa los datos e intenta de nuevo.';
+        setState(() {
+          _loadingShipping = false;
+          _shippingError = msg;
+        });
+      }
     }
   }
 
   bool _isMethodEnabled(PaymentMethod method) {
     switch (method) {
       case PaymentMethod.stripe:
-        return _enabledMethods.contains('stripe');
+        return _availableMethods.stripe;
       case PaymentMethod.mercadopago:
-        return _enabledMethods.contains('mercadopago');
       case PaymentMethod.spei:
-        return _enabledMethods.contains('spei');
+        // El backend solo tiene Stripe/paypal/spei en /payments/available y
+        // los endpoints de cobro de MP/SPEI no existen todavia.
+        return false;
     }
   }
 
@@ -151,7 +212,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   void dispose() {
     _fullNameController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
+    _streetController.dispose();
+    _exteriorController.dispose();
+    _interiorController.dispose();
+    _neighborhoodController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _zipController.dispose();
@@ -197,10 +261,12 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
             TextFormField(
               controller: _fullNameController,
               decoration: const InputDecoration(
-                labelText: 'Nombre completo',
+                labelText: 'Nombre completo (quien recibe)',
                 prefixIcon: Icon(LucideIcons.user),
               ),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              onChanged: (_) => _onShippingFieldChanged(),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -210,16 +276,52 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                 prefixIcon: Icon(LucideIcons.phone),
               ),
               keyboardType: TextInputType.phone,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              onChanged: (_) => _onShippingFieldChanged(),
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: _addressController,
+              controller: _streetController,
               decoration: const InputDecoration(
-                labelText: 'Calle y numero',
+                labelText: 'Calle',
                 prefixIcon: Icon(LucideIcons.mapPin),
               ),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              onChanged: (_) => _onShippingFieldChanged(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextFormField(
+                    controller: _exteriorController,
+                    decoration: const InputDecoration(labelText: 'No. exterior'),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    onChanged: (_) => _onShippingFieldChanged(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: _interiorController,
+                    decoration:
+                        const InputDecoration(labelText: 'No. interior (opcional)'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _neighborhoodController,
+              decoration: const InputDecoration(labelText: 'Colonia'),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+              onChanged: (_) => _onShippingFieldChanged(),
             ),
             const SizedBox(height: 12),
             Row(
@@ -228,7 +330,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                   child: TextFormField(
                     controller: _cityController,
                     decoration: const InputDecoration(labelText: 'Ciudad'),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    onChanged: (_) => _onShippingFieldChanged(),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -236,7 +340,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                   child: TextFormField(
                     controller: _stateController,
                     decoration: const InputDecoration(labelText: 'Estado'),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                    onChanged: (_) => _onShippingFieldChanged(),
                   ),
                 ),
               ],
@@ -246,17 +352,26 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
               controller: _zipController,
               decoration: const InputDecoration(labelText: 'Codigo postal'),
               keyboardType: TextInputType.number,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-              onChanged: (v) {
-                if (v.trim().length >= 5) {
-                  _loadShippingOptions();
-                }
-              },
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) => (v == null || v.trim().length < 5) ? '5 digitos' : null,
+              onChanged: (v) => _onShippingFieldChanged(),
             ),
-            // Opciones de envio
+            // Cotizacion de envio
             if (_loadingShipping) ...[
               const SizedBox(height: 16),
               const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ] else if (_shippingError != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _shippingError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _loadShippingOptions,
+                icon: const Icon(LucideIcons.refreshCw, size: 18),
+                label: const Text('Reintentar cotizacion'),
+              ),
             ],
             if (!_loadingShipping && _shippingOptions.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -268,13 +383,17 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
               const SizedBox(height: 8),
               ..._shippingOptions.map((option) => RadioListTile<ShippingOption>(
                     value: option,
+                    // ignore: deprecated_member_use
                     groupValue: _selectedShipping,
                     title: Text(option.name),
-                    subtitle: Text(option.estimatedDays),
+                    subtitle: option.carrierCode != null
+                        ? Text('Transportista: ${option.carrierCode}')
+                        : null,
                     secondary: Text(
                       option.cost > 0 ? _formatPrice(option.cost) : 'Gratis',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
+                    // ignore: deprecated_member_use
                     onChanged: (v) => setState(() => _selectedShipping = v),
                   )),
             ],
@@ -284,6 +403,24 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       isActive: _currentStep >= 0,
       state: _currentStep > 0 ? StepState.complete : StepState.indexed,
     );
+  }
+
+  /// Recotiza el envio cuando el formulario pasa a estar completo.
+  ///
+  /// Se llama en cada cambio de campo; solo dispara la peticion cuando la
+  /// direccion estructurada esta completa y hace debounce por frame.
+  bool _shippingQuotePending = false;
+
+  void _onShippingFieldChanged() {
+    if (_shippingDetails == null || _loadingShipping) return;
+    if (_shippingQuotePending) return;
+    _shippingQuotePending = true;
+    Future<void>.delayed(const Duration(milliseconds: 500)).then((_) {
+      _shippingQuotePending = false;
+      if (mounted && _shippingDetails != null && !_isProcessing) {
+        _loadShippingOptions();
+      }
+    });
   }
 
   Step _paymentStep(BuildContext context) {
@@ -300,11 +437,20 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           else
             ...PaymentMethod.values.map((method) {
               final enabled = _isMethodEnabled(method);
+              Widget? subtitle;
+              if (!enabled) {
+                subtitle = const Text('Proximamente en el backend');
+              } else if (method == PaymentMethod.stripe &&
+                  Env.stripePublicKey.isEmpty) {
+                subtitle = const Text(
+                    'La instalacion no tiene la llave publica de Stripe: '
+                    'la orden se creara pero el cobro se completa desde la web.');
+              }
               return ListTile(
                 enabled: enabled,
                 leading: Icon(method.icon),
                 title: Text(method.label),
-                subtitle: enabled ? null : const Text('No disponible por el momento'),
+                subtitle: subtitle,
                 trailing: Radio<PaymentMethod>(
                   value: method,
                   // ignore: deprecated_member_use
@@ -448,35 +594,37 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
 
     try {
       final repo = ref.read(checkoutRepositoryProvider);
+      final details = _shippingDetails;
+      if (details == null) {
+        throw Exception('Faltan datos de envio. Completa el paso 1.');
+      }
 
-      // 1. Crear la orden (el backend vacia el carrito en el servidor).
+      // 1. Crear la orden con el contrato real del backend (shippingAddress y
+      //    billingAddress como strings + shippingDetails estructurados + el
+      //    quoteToken del envio elegido). El backend recalcula el total y
+      //    vacia el carrito en el servidor.
       final order = await repo.createOrder(
-        shippingAddress: {
-          'fullName': _fullNameController.text.trim(),
-          'phone': _phoneController.text.trim(),
-          'address': _addressController.text.trim(),
-          'city': _cityController.text.trim(),
-          'state': _stateController.text.trim(),
-          'zip': _zipController.text.trim(),
-        },
-        paymentMethod: _paymentMethod.name,
-        shippingMethodId: _selectedShipping?.id,
+        shippingAddress: details.toString(),
+        billingAddress: details.toString(),
+        shippingDetails: details,
+        shippingQuoteToken: _selectedShipping?.quoteToken,
       );
       final orderId = order['id']?.toString() ?? '';
-      final orderNumber =
-          order['orderNumber']?.toString() ?? orderId;
+      final orderNumber = order['orderNumber']?.toString() ?? orderId;
+      if (orderId.isEmpty) {
+        throw Exception('El backend no devolvio la orden; intenta de nuevo.');
+      }
 
-      // 2. Procesar pago segun el metodo seleccionado.
-      if (_paymentMethod == PaymentMethod.stripe &&
-          Env.stripePublicKey.isNotEmpty &&
-          orderId.isNotEmpty) {
+      // 2. Cobrar. Hoy el unico metodo implementado y activo en el backend
+      //    es Stripe (MercadoPago/SPEI estan deshabilitados / sin endpoints).
+      if (_paymentMethod == PaymentMethod.stripe) {
+        if (Env.stripePublicKey.isEmpty) {
+          throw Exception(
+              'El pago con tarjeta no esta disponible en esta instalacion '
+              '(falta la llave publica de Stripe). Tu orden $orderNumber '
+              'quedo registrada y puedes pagarla desde la web.');
+        }
         await _processStripePayment(repo, orderId, orderNumber);
-      } else if (_paymentMethod == PaymentMethod.mercadopago &&
-          orderId.isNotEmpty) {
-        await _processMercadoPagoPayment(repo, orderId, orderNumber);
-      } else if (_paymentMethod == PaymentMethod.spei &&
-          orderId.isNotEmpty) {
-        await _processSpeiPayment(repo, orderId, orderNumber);
       }
 
       // 3. Sincronizar carrito (el backend ya lo vacio) y mostrar exito.
@@ -526,83 +674,6 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       });
       rethrow;
     }
-  }
-
-  /// Procesa pago con MercadoPago: abre la URL de checkout en el navegador.
-  Future<void> _processMercadoPagoPayment(
-    CheckoutRepository repo, String orderId, String orderNumber) async {
-    final mpResult = await repo.getMercadoPagoPreference(orderId: orderId);
-    if (!mpResult.isValid) {
-      throw Exception('No se pudo iniciar el pago con MercadoPago');
-    }
-    // Abrir la URL de MercadoPago en el navegador del dispositivo.
-    final uri = Uri.parse(mpResult.initPoint);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      throw Exception('No se pudo abrir MercadoPago. '
-          'Tu orden $orderNumber quedo registrada como pendiente.');
-    }
-  }
-
-  /// Procesa pago con SPEI: muestra los datos bancarios para transferencia.
-  Future<void> _processSpeiPayment(
-    CheckoutRepository repo, String orderId, String orderNumber) async {
-    final spei = await repo.getSpeiPaymentData(orderId: orderId);
-    if (!spei.isValid) {
-      // El backend no tiene endpoint SPEI: la orden queda pendiente.
-      return;
-    }
-    // Mostrar dialog con los datos bancarios.
-    if (mounted) {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Pago por SPEI'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Realiza la transferencia con los siguientes datos:'),
-              const SizedBox(height: 16),
-              _speiDataRow('Banco', spei.bank),
-              _speiDataRow('CLABE', spei.clabe),
-              _speiDataRow('Monto', _formatPrice(spei.amount)),
-              _speiDataRow('Referencia', spei.reference),
-              _speiDataRow('Concepto', spei.concept),
-              const SizedBox(height: 12),
-              const Text(
-                'Tu orden quedara pendiente hasta que confirmemos el pago.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Widget _speiDataRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-          Expanded(child: SelectableText(value)),
-        ],
-      ),
-    );
   }
 
   Future<void> _syncCart() async {

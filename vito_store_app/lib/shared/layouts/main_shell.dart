@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../features/chatbot/presentation/chatbot_sheet.dart';
+import '../../features/notificaciones/data/notification_repository.dart';
 
 /// Shell principal con bottom navigation (Inicio · Tienda · Cuenta · Favoritos)
 /// y FAB global del chatbot.
@@ -12,7 +14,7 @@ import '../../features/chatbot/presentation/chatbot_sheet.dart';
 /// - Labels siempre visibles (accesibilidad).
 /// - IndexedStack implícito vía go_router ShellRoute (preserva estado de tab).
 /// - Touch targets ≥48dp (Material 3 NavigationBar a 80dp).
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({required this.child, super.key});
 
   final Widget child;
@@ -33,8 +35,11 @@ class MainShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final index = _currentIndex(context);
+    // Badge de notificaciones sin leer sobre el tab de Cuenta
+    // (acceso a /notificaciones). El provider consulta /unread-count.
+    final unread = ref.watch(unreadCountProvider);
     return Scaffold(
       body: child,
       floatingActionButton: Semantics(
@@ -50,11 +55,23 @@ class MainShell extends StatelessWidget {
         selectedIndex: index,
         onDestinationSelected: (i) => context.go(_destinations[i].location),
         destinations: [
-          for (final d in _destinations)
+          for (var i = 0; i < _destinations.length; i++)
             NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.icon, fill: 1),
-              label: d.label,
+              icon: i == 2 && unread > 0
+                  ? Badge(
+                      isLabelVisible: true,
+                      label: Text(unread > 99 ? '99+' : '$unread'),
+                      child: Icon(_destinations[i].icon),
+                    )
+                  : Icon(_destinations[i].icon),
+              selectedIcon: i == 2 && unread > 0
+                  ? Badge(
+                      isLabelVisible: true,
+                      label: Text(unread > 99 ? '99+' : '$unread'),
+                      child: Icon(_destinations[i].icon, fill: 1),
+                    )
+                  : Icon(_destinations[i].icon, fill: 1),
+              label: _destinations[i].label,
             ),
         ],
       ),

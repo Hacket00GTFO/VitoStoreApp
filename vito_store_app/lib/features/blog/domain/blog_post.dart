@@ -18,6 +18,7 @@ class BlogPost {
 
   factory BlogPost.fromJson(Map<String, dynamic> json) {
     final author = json['author'];
+    final category = json['category'];
     return BlogPost(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
@@ -31,11 +32,10 @@ class BlogPost {
       author: author is Map
           ? (author['name']?.toString() ?? author['fullName']?.toString())
           : author?.toString(),
-      category: json['category']?.toString() ??
-          (json['categoryName']?.toString()) ??
-          (json['tags'] is List && (json['tags'] as List).isNotEmpty
-              ? (json['tags'] as List).first.toString()
-              : null),
+      // El backend envia `category` como objeto {id,name,slug,color}.
+      category: category is Map<String, dynamic>
+          ? category['name']?.toString()
+          : category?.toString() ?? json['categoryName']?.toString(),
       publishedAt: json['publishedAt'] != null
           ? DateTime.tryParse(json['publishedAt'].toString())
           : (json['createdAt'] != null

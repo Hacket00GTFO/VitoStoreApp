@@ -97,7 +97,7 @@ class _AccountPageState extends ConsumerState<AccountPage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
+              children: const [
                 _OrdersTab(),
                 _QuotesTab(),
                 _ServicesTab(),
@@ -267,13 +267,13 @@ class _AccountPageState extends ConsumerState<AccountPage>
                   emailVerified: user.emailVerified,
                 );
                 ref.read(authControllerProvider.notifier).updateUser(newUser);
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Perfil actualizado')),
                   );
                 }
               } catch (e) {
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error: $e')),
                   );
@@ -357,14 +357,21 @@ class _AccountPageState extends ConsumerState<AccountPage>
                       currentPassword: currentCtrl.text,
                       newPassword: newCtrl.text,
                     );
-                if (mounted) {
+                // El backend revoca las sesiones al cambiar contrasena:
+                // limpiar tokens locales y mandar a login. El aviso se muestra
+                // ANTES del logout porque el redirect del router puede
+                // desmontar esta pagina y dejar el context sin mounted.
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Contrasena actualizada')),
+                        content: Text(
+                            'Contrasena actualizada. Inicia sesion de nuevo.')),
                   );
                 }
+                await ref.read(authControllerProvider.notifier).logout();
+                if (context.mounted) context.go('/login');
               } catch (e) {
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error: $e')),
                   );
@@ -379,80 +386,112 @@ class _AccountPageState extends ConsumerState<AccountPage>
   }
 }
 
-/// Tab de ordenes: carga la lista via [accountRepositoryProvider].
-class _OrdersTab extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_OrdersTab> createState() => _OrdersTabState();
+/// Refresca el historial unificado (pull-to-refresh de los 4 tabs).
+///
+/// Captura el error: el fallo ya se refleja via AsyncValue (pantalla de
+/// error del tab); dejarlo escapar provocaria una excepcion async no
+/// manejada por RefreshIndicator.
+Future<void> _refreshHistory(WidgetRef ref) async {
+  try {
+    ref.invalidate(accountHistoryProvider);
+    await ref.read(accountHistoryProvider.future);
+  } catch (_) {
+    // El error se muestra con el estado de error del provider.
+  }
 }
 
-class _OrdersTabState extends ConsumerState<_OrdersTab> {
-  Future<List<Order>>? _ordersFuture;
+/// Pantalla de carga compartida por los tabs del historial.
+class _TabLoadingView extends StatelessWidget {
+  const _TabLoadingView();
 
   @override
-  void initState() {
-    super.initState();
-    _ordersFuture = ref.read(accountRepositoryProvider).getOrders();
-  }
+  Widget build(BuildContext context) =>
+      const Center(child: CircularProgressIndicator());
+}
 
-  Future<void> _refresh() async {
-    setState(() {
-      _ordersFuture = ref.read(accountRepositoryProvider).getOrders();
-    });
+/// Pantalla de error con Reintentar (invalida el historial unificado).
+class _TabErrorView extends ConsumerWidget {
+  const _TabErrorView({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.alertCircle,
+              size: 48, color: Theme.of(context).colorScheme.error),
+          const SizedBox(height: 16),
+          Text(message, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: () => ref.invalidate(accountHistoryProvider),
+            icon: const Icon(LucideIcons.refreshCw),
+            label: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
   }
+}
+
+/// Pantalla vacia compartida por los tabs del historial.
+class _TabEmptyView extends StatelessWidget {
+  const _TabEmptyView({required this.icon, required this.message, this.action});
+
+  final IconData icon;
+  final String message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Order>>(
-        future: _ordersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.alertCircle,
-                      size: 48, color: Theme.of(context).colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar ordenes',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(LucideIcons.refreshCw),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final orders = snapshot.data ?? [];
-          if (orders.isEmpty) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                Center(
-                  child: Column(
-                    children: [
-                      Icon(LucideIcons.packageOpen,
-                          size: 48, color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(height: 16),
-                      const Text('No tienes ordenes aun.'),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: () => context.go('/tienda'),
-                        child: const Text('Explorar productos'),
-                      ),
-                    ],
-                  ),
-                ),
+    return ListView(
+      children: [
+        const SizedBox(height: 80),
+        Center(
+          child: Column(
+            children: [
+              Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
+              const SizedBox(height: 16),
+              Text(message),
+              if (action != null) ...[
+                const SizedBox(height: 20),
+                action!,
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Tab de ordenes: consume el historial unificado ([accountHistoryProvider]).
+class _OrdersTab extends ConsumerWidget {
+  const _OrdersTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncHistory = ref.watch(accountHistoryProvider);
+    return RefreshIndicator(
+      onRefresh: () => _refreshHistory(ref),
+      child: asyncHistory.when(
+        // Default (skipLoadingOnRefresh): durante el pull-to-refresh se
+        // conserva la data actual hasta que llega la nueva (sin flash).
+        loading: () => const _TabLoadingView(),
+        error: (_, __) => const _TabErrorView(message: 'Error al cargar ordenes'),
+        data: (history) {
+          final orders = history.orders.map(Order.fromJson).toList();
+          if (orders.isEmpty) {
+            return _TabEmptyView(
+              icon: LucideIcons.packageOpen,
+              message: 'No tienes ordenes aun.',
+              action: FilledButton(
+                onPressed: () => context.go('/tienda'),
+                child: const Text('Explorar productos'),
+              ),
             );
           }
           return ListView.separated(
@@ -518,7 +557,7 @@ class _OrderCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _formatPrice(item.subtotal),
+                          item.subtotalLabel,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -588,85 +627,51 @@ class _StatusBadge extends StatelessWidget {
         return (Colors.orange, 'Procesando');
       case 'CANCELLED':
         return (Colors.red, 'Cancelado');
+      case 'REJECTED':
+        return (Colors.red, 'Rechazada');
       case 'PENDING':
         return (Colors.grey, 'Pendiente');
       case 'PAID':
         return (Colors.green, 'Pagado');
+      case 'IN_REVIEW':
+        return (Colors.orange, 'En revision');
+      case 'APPROVED':
+        return (Colors.green, 'Aprobada');
+      case 'IN_PROGRESS':
+        return (Colors.blue, 'En progreso');
+      case 'COMPLETED':
+        return (Colors.green, 'Completada');
+      case 'REVIEWING':
+        return (Colors.orange, 'En revision');
+      case 'QUOTED':
+        return (Colors.teal, 'Cotizada');
+      case 'ACCEPTED':
+        return (Colors.green, 'Aceptada');
       default:
         return (Colors.grey, status);
     }
   }
 }
 
-/// Tab de cotizaciones: carga la lista via [accountRepositoryProvider].
-class _QuotesTab extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_QuotesTab> createState() => _QuotesTabState();
-}
-
-class _QuotesTabState extends ConsumerState<_QuotesTab> {
-  Future<List<Map<String, dynamic>>>? _quotesFuture;
+/// Tab de cotizaciones: consume el historial unificado.
+class _QuotesTab extends ConsumerWidget {
+  const _QuotesTab();
 
   @override
-  void initState() {
-    super.initState();
-    _quotesFuture = ref.read(accountRepositoryProvider).getQuotes();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _quotesFuture = ref.read(accountRepositoryProvider).getQuotes();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncHistory = ref.watch(accountHistoryProvider);
     return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _quotesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.alertCircle,
-                      size: 48, color: Theme.of(context).colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar cotizaciones',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(LucideIcons.refreshCw),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final quotes = snapshot.data ?? [];
+      onRefresh: () => _refreshHistory(ref),
+      child: asyncHistory.when(
+        loading: () => const _TabLoadingView(),
+        error: (_, __) =>
+            const _TabErrorView(message: 'Error al cargar cotizaciones'),
+        data: (history) {
+          final quotes = history.specializedQuotes;
           if (quotes.isEmpty) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                Center(
-                  child: Column(
-                    children: [
-                      Icon(LucideIcons.fileText,
-                          size: 48, color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(height: 16),
-                      const Text('No tienes cotizaciones aun.'),
-                    ],
-                  ),
-                ),
-              ],
+            return const _TabEmptyView(
+              icon: LucideIcons.fileText,
+              message: 'No tienes cotizaciones aun.',
             );
           }
           return ListView.separated(
@@ -682,7 +687,7 @@ class _QuotesTabState extends ConsumerState<_QuotesTab> {
   }
 }
 
-/// Card individual de una cotizacion.
+/// Card individual de una cotizacion (row de `SpecializedQuote` proyectada).
 class _QuoteCard extends StatelessWidget {
   const _QuoteCard({required this.quote});
 
@@ -690,12 +695,15 @@ class _QuoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number = (quote['quoteNumber'] ?? quote['number'] ?? '-').toString();
+    final number =
+        (quote['quoteNumber'] ?? quote['number'] ?? '-').toString();
     final status = (quote['status'] ?? 'PENDING').toString();
     final date = (quote['date'] ?? quote['createdAt'] ?? '').toString();
-    final total = (quote['total'] is num)
-        ? (quote['total'] as num).toDouble()
-        : double.tryParse('${quote['total']}') ?? 0.0;
+    final serviceName = (quote['serviceName'] ?? '').toString();
+    // SpecializedQuote no tiene `total`: el monto esta en finalCost (cuando
+    // el admin lo define) o estimatedCost; Decimal de Prisma llega como String.
+    final totalValue = quote['finalCost'] ?? quote['estimatedCost'];
+    final total = double.tryParse('${totalValue ?? ''}') ?? 0.0;
 
     return Card(
       child: Padding(
@@ -717,25 +725,37 @@ class _QuoteCard extends StatelessWidget {
                 _StatusBadge(status: status),
               ],
             ),
-            const SizedBox(height: 8),
-            if (date.isNotEmpty)
+            if (serviceName.isNotEmpty) ...[
+              const SizedBox(height: 4),
               Text(
-                date,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
+                serviceName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              'Solicitada: $date',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+            ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Total', style: Theme.of(context).textTheme.bodyMedium),
                 Text(
-                  _formatPrice(total),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  total > 0 ? 'Total' : 'Monto sin definir',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
+                if (total > 0)
+                  Text(
+                    _formatPrice(total),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
               ],
             ),
           ],
@@ -745,75 +765,25 @@ class _QuoteCard extends StatelessWidget {
   }
 }
 
-/// Tab de servicios: carga la lista via [accountRepositoryProvider].
-class _ServicesTab extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_ServicesTab> createState() => _ServicesTabState();
-}
-
-class _ServicesTabState extends ConsumerState<_ServicesTab> {
-  Future<List<Map<String, dynamic>>>? _servicesFuture;
+/// Tab de servicios: consume el historial unificado.
+class _ServicesTab extends ConsumerWidget {
+  const _ServicesTab();
 
   @override
-  void initState() {
-    super.initState();
-    _servicesFuture = ref.read(accountRepositoryProvider).getUserServices();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _servicesFuture = ref.read(accountRepositoryProvider).getUserServices();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncHistory = ref.watch(accountHistoryProvider);
     return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _servicesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.alertCircle,
-                      size: 48, color: Theme.of(context).colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar servicios',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(LucideIcons.refreshCw),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final services = snapshot.data ?? [];
+      onRefresh: () => _refreshHistory(ref),
+      child: asyncHistory.when(
+        loading: () => const _TabLoadingView(),
+        error: (_, __) =>
+            const _TabErrorView(message: 'Error al cargar servicios'),
+        data: (history) {
+          final services = history.serviceRequests;
           if (services.isEmpty) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                Center(
-                  child: Column(
-                    children: [
-                      Icon(LucideIcons.wrench,
-                          size: 48, color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(height: 16),
-                      const Text('No tienes servicios solicitados aun.'),
-                    ],
-                  ),
-                ),
-              ],
+            return const _TabEmptyView(
+              icon: LucideIcons.wrench,
+              message: 'No tienes servicios solicitados aun.',
             );
           }
           return ListView.separated(
@@ -829,7 +799,7 @@ class _ServicesTabState extends ConsumerState<_ServicesTab> {
   }
 }
 
-/// Card individual de un servicio.
+/// Card individual de un servicio (row de `ServiceRequest` proyectada).
 class _ServiceCard extends StatelessWidget {
   const _ServiceCard({required this.service});
 
@@ -837,9 +807,19 @@ class _ServiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = (service['name'] ?? service['serviceName'] ?? 'Servicio').toString();
+    // El nombre del servicio vive en la relacion `service.name` (la row no
+    // trae un campo `name` propio).
+    final related = service['service'] is Map<String, dynamic>
+        ? service['service'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final name =
+        (service['name'] ?? service['serviceName'] ?? related['name'] ?? 'Servicio')
+            .toString();
+    final number =
+        (service['requestNumber'] ?? service['number'] ?? '').toString();
     final status = (service['status'] ?? 'PENDING').toString();
-    final date = (service['dateRequested'] ?? service['createdAt'] ?? '').toString();
+    final date =
+        (service['dateRequested'] ?? service['createdAt'] ?? '').toString();
 
     return Card(
       child: Padding(
@@ -861,10 +841,17 @@ class _ServiceCard extends StatelessWidget {
                 _StatusBadge(status: status),
               ],
             ),
-            if (date.isNotEmpty) ...[
-              const SizedBox(height: 8),
+            if (number.isNotEmpty) ...[
+              const SizedBox(height: 4),
               Text(
-                date,
+                'Folio: $number',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (date.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Solicitado: $date',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
                     ),
@@ -877,75 +864,25 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-/// Tab de facturas: carga la lista via [accountRepositoryProvider].
-class _InvoicesTab extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_InvoicesTab> createState() => _InvoicesTabState();
-}
-
-class _InvoicesTabState extends ConsumerState<_InvoicesTab> {
-  Future<List<Map<String, dynamic>>>? _invoicesFuture;
+/// Tab de facturas: consume el historial unificado.
+class _InvoicesTab extends ConsumerWidget {
+  const _InvoicesTab();
 
   @override
-  void initState() {
-    super.initState();
-    _invoicesFuture = ref.read(accountRepositoryProvider).getInvoices();
-  }
-
-  Future<void> _refresh() async {
-    setState(() {
-      _invoicesFuture = ref.read(accountRepositoryProvider).getInvoices();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncHistory = ref.watch(accountHistoryProvider);
     return RefreshIndicator(
-      onRefresh: _refresh,
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _invoicesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.alertCircle,
-                      size: 48, color: Theme.of(context).colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar facturas',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _refresh,
-                    icon: const Icon(LucideIcons.refreshCw),
-                    label: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final invoices = snapshot.data ?? [];
+      onRefresh: () => _refreshHistory(ref),
+      child: asyncHistory.when(
+        loading: () => const _TabLoadingView(),
+        error: (_, __) =>
+            const _TabErrorView(message: 'Error al cargar facturas'),
+        data: (history) {
+          final invoices = history.invoiceRequests;
           if (invoices.isEmpty) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                Center(
-                  child: Column(
-                    children: [
-                      Icon(LucideIcons.receipt,
-                          size: 48, color: Theme.of(context).colorScheme.outline),
-                      const SizedBox(height: 16),
-                      const Text('No tienes facturas aun.'),
-                    ],
-                  ),
-                ),
-              ],
+            return const _TabEmptyView(
+              icon: LucideIcons.receipt,
+              message: 'No tienes facturas aun.',
             );
           }
           return ListView.separated(
@@ -961,7 +898,7 @@ class _InvoicesTabState extends ConsumerState<_InvoicesTab> {
   }
 }
 
-/// Card individual de una factura.
+/// Card individual de una solicitud de factura (`InvoiceRequest` proyectada).
 class _InvoiceCard extends StatelessWidget {
   const _InvoiceCard({required this.invoice});
 
@@ -969,13 +906,18 @@ class _InvoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final number =
-        (invoice['invoiceNumber'] ?? invoice['number'] ?? '-').toString();
+    // InvoiceRequest no trae monto ni numero de factura (aun no emitida):
+    // tiene folio de solicitud `requestNumber` y datos fiscales.
+    final number = (invoice['invoiceNumber'] ??
+            invoice['requestNumber'] ??
+            invoice['number'] ??
+            '-')
+        .toString();
     final status = (invoice['status'] ?? 'PENDING').toString();
     final date = (invoice['date'] ?? invoice['createdAt'] ?? '').toString();
-    final amount = (invoice['amount'] is num)
-        ? (invoice['amount'] as num).toDouble()
-        : double.tryParse('${invoice['amount']}') ?? 0.0;
+    final fiscalName = (invoice['fiscalName'] ?? '').toString();
+    final fiscalRfc = (invoice['fiscalRFC'] ?? '').toString();
+    final type = (invoice['invoiceType'] ?? '').toString();
 
     return Card(
       child: Padding(
@@ -1000,24 +942,32 @@ class _InvoiceCard extends StatelessWidget {
             const SizedBox(height: 8),
             if (date.isNotEmpty)
               Text(
-                date,
+                'Solicitada: $date',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
                     ),
               ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Monto', style: Theme.of(context).textTheme.bodyMedium),
-                Text(
-                  _formatPrice(amount),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ],
-            ),
+            if (fiscalName.isNotEmpty || fiscalRfc.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                [
+                  if (fiscalName.isNotEmpty) fiscalName,
+                  if (fiscalRfc.isNotEmpty) 'RFC: $fiscalRfc',
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (type.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Tipo: ${type.toLowerCase().contains('credit') ? 'Credito' : 'Publico general'}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+              ),
+            ],
           ],
         ),
       ),

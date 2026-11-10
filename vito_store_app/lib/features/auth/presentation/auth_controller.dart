@@ -147,6 +147,22 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Adopta una sesion ya canjeada externamente (p.ej. `verify-email`
+  /// respondio `{user, tokens}`): la persiste sin un segundo login.
+  Future<void> adoptSession(LoginResult result) async {
+    if (!result.hasTokens) return;
+    await ref.read(secureStorageWrapperProvider).saveTokens(
+          accessToken: result.accessToken!,
+          refreshToken: result.refreshToken!,
+        );
+    state = AuthState(
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      status: AuthStatus.authenticated,
+    );
+  }
+
   /// Actualiza el usuario en el estado (tras editar perfil).
   void updateUser(User user) {
     state = state.copyWith(user: user, status: AuthStatus.authenticated);

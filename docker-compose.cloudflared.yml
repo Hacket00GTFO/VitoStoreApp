@@ -1,16 +1,42 @@
 # Cloudflare Quick Tunnel para VitoStoreApp
-# Expone vito-api:3001 a internet sin cuenta de Cloudflare.
-# La URL pública (https://*.trycloudflare.com) cambia en cada reinicio;
-# usa scripts/get-tunnel-url.ps1 para obtenerla.
+# - cloudflared: expone el stack a internet (URL cambia en cada reinicio;
+#   usa scripts/get-tunnel-url.ps1 para obtenerla). Ahora apunta al
+#   contenedor `vitostoreapp` (nginx) y NO directo a la API: la web de la app
+#   queda en el mismo origen y el backend sigue alcanzable en `<tunel>/api/...`
+#   vía proxy de nginx.
+# - vitostoreapp: sirve el build de Flutter Web (`vito_store_app/build/web`,
+#   montado read-only) y hace proxy de /api → vito-api:3001.
 #
 # Requisito: el stack backend (desingVITO/backend) debe estar corriendo,
 # ya que este compose se une a su red como externa (no la crea ni la gestiona).
+#
+# Para actualizar el build web:
+#   flutter build web --release                (desde vito_store_app/)
+#   docker compose -f docker-compose.cloudflared.yml up -d vitostoreapp cloudflared
 services:
   cloudflared:
     image: cloudflare/cloudflared:2026.7.3
     container_name: vitostore-cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --protocol http2 --url http://vito-api:3001
+    command: tunnel --no-autoupdate --protocol http2 --url http://vitostoreapp:80
+    networks:
+      - backend_vito-network
+
+  vitostoreapp:
+    build: ./docker/vitostoreapp
+    image: vitostoreapp-web:local
+    container_name: vitostoreapp
+    restart: unless-stopped
+    volumes:
+      - ./vito_store_app/build/web:/usr/share/nginx/html:ro
+      - ./docker/vitostoreapp/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - cloudflared
     networks:
       - backend_vito-network
 

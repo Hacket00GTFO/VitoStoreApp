@@ -44,14 +44,21 @@ class _VerifyAccountPageState extends ConsumerState<VerifyAccountPage> {
     });
     try {
       final repo = ref.read(authRepositoryProvider);
-      await repo.verifyEmail(email: _emailCtrl.text.trim(), code: _codeCtrl.text.trim());
+      final result =
+          await repo.verifyEmail(email: _emailCtrl.text.trim(), code: _codeCtrl.text.trim());
+      // El backend responde {user, tokens}: dejar la sesion iniciada directo.
+      await ref.read(authControllerProvider.notifier).adoptSession(result);
       setState(() => _success = true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cuenta verificada. Ya puedes iniciar sesion.')),
+          SnackBar(
+            content: Text(result.hasTokens
+                ? 'Cuenta verificada. Sesion iniciada.'
+                : 'Cuenta verificada. Ya puedes iniciar sesion.'),
+          ),
         );
         Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) context.go('/login');
+          if (mounted) context.go(result.hasTokens ? '/' : '/login');
         });
       }
     } catch (e) {

@@ -9,20 +9,17 @@ import '../domain/blog_post.dart';
 import 'blog_card.dart';
 import 'blog_post_page.dart';
 
-/// Categorias disponibles para filtrar el blog (espejo de la web).
-const List<String> blogCategories = [
-  'Novedades',
-  'Noticias',
-  'Casos de exito',
-  'Guias',
-  'Eventos',
-];
-
-/// Provider asincrono del listado de posts, dependiente de la categoria activa.
+/// Provider asincrono del listado de posts (categoria = SLUG del backend;
+/// no el nombre). El backend aplica paginacion y excluye 'novedades' de la
+/// lista general. Si el backend no reporta categorias, los chips se ocultan
+/// y el listado sale completo ('Todos').
 final blogPostsProvider =
-    FutureProvider.autoDispose.family<List<BlogPost>, String?>((ref, category) async {
+    FutureProvider.autoDispose.family<List<BlogPost>, String?>((ref, slug) async {
   final repo = ref.watch(blogRepositoryProvider);
-  return repo.listPosts(category: category);
+  final search = ref.watch(blogSearchQueryProvider);
+  final (:posts, total: _) =
+      await repo.listPosts(category: slug, search: search);
+  return posts;
 });
 
 /// Pagina de blog. Listado de posts filtrable por categoria con chips.
@@ -35,16 +32,17 @@ class BlogPage extends ConsumerStatefulWidget {
 }
 
 class _BlogPageState extends ConsumerState<BlogPage> {
-  String? _selectedCategory;
+  String? _selectedSlug;
 
   Future<void> _refresh() async {
-    ref.invalidate(blogPostsProvider(_selectedCategory));
-    await ref.read(blogPostsProvider(_selectedCategory).future);
+    ref.invalidate(blogPostsProvider(_selectedSlug));
+    await ref.read(blogPostsProvider(_selectedSlug).future);
   }
 
   @override
   Widget build(BuildContext context) {
-    final postsAsync = ref.watch(blogPostsProvider(_selectedCategory));
+    final postsAsync = ref.watch(blogPostsProvider(_selectedSlug));
+    final categoriesAsync = ref.watch(blogCategoriesProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(ref.tr('blog'))),
@@ -52,16 +50,24 @@ class _BlogPageState extends ConsumerState<BlogPage> {
         onRefresh: _refresh,
         child: Column(
           children: [
-            // Chips de categoria
+            // Chips de categoria reales del backend.
             SizedBox(
               height: 48,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                children: [
-                  _categoryChip(context, 'Todos', null),
-                  ...blogCategories.map((c) => _categoryChip(context, c, c)),
-                ],
+              child: categoriesAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (categories) {
+                  final chips = <Widget>[
+                    _categoryChip('Todos', null),
+                    ...categories.map((c) => _categoryChip(c.name, c.slug)),
+                  ];
+                  return ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    children: chips,
+                  );
+                },
               ),
             ),
             Expanded(
@@ -89,8 +95,8 @@ class _BlogPageState extends ConsumerState<BlogPage> {
     );
   }
 
-  Widget _categoryChip(BuildContext context, String label, String? value) {
-    final selected = _selectedCategory == value;
+  Widget _categoryChip(String label, String? slug) {
+    final selected = _selectedSlug == slug;
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -98,7 +104,7 @@ class _BlogPageState extends ConsumerState<BlogPage> {
         label: Text(label),
         selected: selected,
         onSelected: (_) {
-          setState(() => _selectedCategory = value);
+          setState(() => _selectedSlug = slug);
         },
         selectedColor: theme.colorScheme.primaryContainer,
         labelStyle: TextStyle(

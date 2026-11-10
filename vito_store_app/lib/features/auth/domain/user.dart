@@ -13,13 +13,16 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // GET /account/me anida el telefono en `profile.phone` (UserProfile).
+    final profile = json['profile'];
     return User(
       id: json['id'] as String,
       email: json['email'] as String,
       role: (json['role'] as String?) ?? 'USER',
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
-      phone: json['phone'] as String?,
+      phone: (json['phone'] as String?) ??
+          (profile is Map<String, dynamic> ? profile['phone'] as String? : null),
       emailVerified: json['emailVerified'] as bool?,
     );
   }

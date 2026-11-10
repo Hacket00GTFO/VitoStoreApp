@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../shared/widgets/state_view.dart';
 import '../data/category_repository.dart';
+import '../domain/category.dart';
 import '../domain/product.dart';
 import 'product_card.dart';
 import 'products_catalog_controller.dart';
@@ -35,7 +36,7 @@ class ProductsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(catalog.category != null
-            ? 'Categoria: ${catalog.category}'
+            ? 'Categoria: ${categoryName(catalog.category)}'
             : 'Productos'),
         actions: [
           IconButton(
@@ -143,11 +144,11 @@ class _ProductGridState extends ConsumerState<_ProductGrid> {
 class _FiltersSheet extends ConsumerWidget {
   const _FiltersSheet();
 
+  // Valores validos del backend: PRODUCT_SORTS = ['name','price-asc','price-desc'].
   static const _sortOptions = <(String, String)>[
-    ('recent', 'Mas recientes'),
+    ('name', 'Nombre: A-Z'),
     ('price-asc', 'Precio: menor a mayor'),
     ('price-desc', 'Precio: mayor a menor'),
-    ('name-asc', 'Nombre: A-Z'),
   ];
 
   @override

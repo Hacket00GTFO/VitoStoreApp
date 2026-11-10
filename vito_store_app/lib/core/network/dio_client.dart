@@ -32,6 +32,9 @@ class DioClient {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // Trazabilidad de logs en el backend (Fase 3.5): particiona las peticiones
+        // de la app en los logs del servidor (la web manda su propio header).
+        'X-VITO-CLIENT': 'vito-app',
       },
     ));
 

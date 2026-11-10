@@ -69,6 +69,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  /// Reenvia el codigo 2FA (`POST /account/login-resend`).
+  Future<void> _resendCode() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) return;
+    try {
+      await ref.read(authRepositoryProvider).resendLoginCode(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Codigo reenviado a $email')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo reenviar: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,6 +149,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     keyboardType: TextInputType.number,
                     maxLength: 6,
                     validator: (v) => (v == null || v.length != 6) ? '6 digitos' : null,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _loading ? null : _resendCode,
+                      icon: const Icon(LucideIcons.refreshCw, size: 18),
+                      label: const Text('Reenviar codigo'),
+                    ),
                   ),
                 ],
                 if (_error != null) ...[

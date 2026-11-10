@@ -4,30 +4,74 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../config/api_config.dart';
 import '../../../shared/providers/providers.dart';
 
-/// Repositorio de checkout. Consume `/api/orders`, `/api/payments/*` y
-/// `/api/shipping/options`.
+/// Repositorio de checkout. Consume `/api/orders`, `/api/orders/shipping-options`
+/// y `/api/payments/*` — contratos reales del backend (verificados contra
+/// `vito-api` y el frontend web `services/orderService.ts`).
 ///
-/// Replica el flujo de compra de la web: crear orden -> procesar pago.
-/// Soporta Stripe, MercadoPago y SPEI.
+/// Flujo de compra de la web: shipping-options (con direccion estructurada) →
+/// create-order (shippingAddress/billingAddress como strings + shippingDetails
+/// + shippingQuoteToken) → payments/stripe/create-intent → PaymentSheet.
 class CheckoutRepository {
   CheckoutRepository(this._dio);
 
   final Dio _dio;
 
-  /// Crea una orden a partir del carrito actual.
+  /// Obtiene las opciones de envio para una direccion estructurada.
   ///
-  /// Devuelve el mapa con `id`, `orderNumber`, `total`, etc.
+  /// Consume `POST /api/orders/shipping-options` (requiere Bearer) con body
+  /// `{shippingDetails:{recipient, phone, street, exteriorNumber,
+  /// interiorNumber?, neighborhood, city, state, postalCode, country}}`.
+  ///
+  /// Responde `{requiresSelection, syscomOnly, baseShipping, subtotalMxn,
+  /// options:[{quoteToken, kind, carrierCode, carrierName, freight, currency,
+  /// freightMxn, shippingTotalMxn}]}`. Si `requiresSelection` es true hay que
+  /// devolver el `quoteToken` de la opcion elegida al crear la orden.
+  Future<ShippingQuotesResult> getShippingOptions({
+    required ShippingDetails shippingDetails,
+  }) async {
+    final resp = await _dio.post(
+      '${ApiEndpoints.base}/orders/shipping-options',
+      data: {'shippingDetails': shippingDetails.toJson()},
+    );
+    final data = resp.data is Map<String, dynamic>
+        ? resp.data as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final inner = data['data'] is Map<String, dynamic>
+        ? data['data'] as Map<String, dynamic>
+        : data;
+    final items = (inner['options'] as List?) ?? const [];
+    final options =
+        items.map((e) => ShippingOption.fromJson(e as Map<String, dynamic>)).toList();
+    return ShippingQuotesResult(
+      requiresSelection: inner['requiresSelection'] == true,
+      syscomOnly: inner['syscomOnly'] == true,
+      baseShipping: (inner['baseShipping'] as num?)?.toDouble() ?? 0,
+      subtotalMxn: (inner['subtotalMxn'] as num?)?.toDouble() ?? 0,
+      options: options,
+    );
+  }
+
+  /// Crea la orden a partir del carrito actual.
+  ///
+  /// Contrato web verificado: `POST /api/orders` con
+  /// `{shippingAddress: "texto", billingAddress: "texto", notes?,
+  /// shippingDetails: {...}, shippingQuoteToken?}` →
+  /// `201 {success, data:{order}}`. El backend recalcula el total (envio
+  /// inclucido) y vacia el carrito en el servidor.
   Future<Map<String, dynamic>> createOrder({
-    required Map<String, dynamic> shippingAddress,
-    String? paymentMethod,
-    String? shippingMethodId,
+    required String shippingAddress,
+    required String billingAddress,
+    required ShippingDetails shippingDetails,
+    String? shippingQuoteToken,
     String? notes,
   }) async {
     final resp = await _dio.post(ApiEndpoints.orders, data: {
       'shippingAddress': shippingAddress,
-      if (paymentMethod != null) 'paymentMethod': paymentMethod,
-      if (shippingMethodId != null) 'shippingMethodId': shippingMethodId,
-      if (notes != null) 'notes': notes,
+      'billingAddress': billingAddress,
+      'shippingDetails': shippingDetails.toJson(),
+      if (shippingQuoteToken != null && shippingQuoteToken.isNotEmpty)
+        'shippingQuoteToken': shippingQuoteToken,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
     });
     final data = resp.data;
     // Contrato del backend: 201 { success, data: { order: {...} } }.
@@ -66,170 +110,180 @@ class CheckoutRepository {
     return '';
   }
 
-  /// Crea una preferencia de MercadoPago para la orden indicada.
-  ///
-  /// Consume `POST /api/payments/mercadopago/create-preference`.
-  /// Devuelve el `initPoint` (URL de checkout de MercadoPago) y el `preferenceId`.
-  Future<MercadoPagoResult> getMercadoPagoPreference({
-    required String orderId,
-  }) async {
-    final resp = await _dio.post(
-      '${ApiEndpoints.payments.mercadopago}/create-preference',
-      data: {'orderId': orderId},
-    );
-    final data = resp.data;
-    if (data is Map<String, dynamic>) {
-      final inner = data['data'];
-      final source = inner is Map<String, dynamic> ? inner : data;
-      return MercadoPagoResult(
-        preferenceId: source['preferenceId']?.toString() ?? '',
-        initPoint: source['initPoint']?.toString() ??
-            source['sandboxInitPoint']?.toString() ??
-            '',
-      );
-    }
-    return const MercadoPagoResult(preferenceId: '', initPoint: '');
-  }
-
-  /// Genera datos para pago SPEI (transferencia bancaria).
-  ///
-  /// Consume `POST /api/payments/spei/create`.
-  /// Devuelve el CLABE, banco receptor, monto y concepto de referencia.
-  Future<SpeiResult> getSpeiPaymentData({
-    required String orderId,
-  }) async {
-    final resp = await _dio.post(
-      '${ApiEndpoints.base}/payments/spei/create',
-      data: {'orderId': orderId},
-    );
-    final data = resp.data;
-    if (data is Map<String, dynamic>) {
-      final inner = data['data'];
-      final source = inner is Map<String, dynamic> ? inner : data;
-      return SpeiResult(
-        clabe: source['clabe']?.toString() ?? '',
-        bank: source['bank']?.toString() ?? 'STP',
-        reference: source['reference']?.toString() ?? orderId,
-        amount: (source['amount'] as num?)?.toDouble() ?? 0,
-        concept: source['concept']?.toString() ?? 'Pago orden $orderId',
-      );
-    }
-    return SpeiResult(clabe: '', bank: '', reference: '', amount: 0, concept: '');
-  }
-
-  /// Obtiene las opciones de envio disponibles para una direccion.
-  ///
-  /// Consume `POST /api/shipping/options` con el codigo postal y la direccion.
-  /// Devuelve una lista de metodos con id, nombre, costo y tiempo estimado.
-  Future<List<ShippingOption>> getShippingOptions({
-    required String zipCode,
-  }) async {
-    try {
-      final resp = await _dio.post(
-        '${ApiEndpoints.base}/shipping/options',
-        data: {'zipCode': zipCode},
-      );
-      final data = resp.data;
-      final List<dynamic> items = data is List
-          ? data
-          : (data is Map<String, dynamic>
-              ? (data['data'] as List?) ?? (data['options'] as List?) ?? []
-              : []);
-      return items
-          .map((e) => ShippingOption.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      // Si el backend no tiene endpoint de shipping, devolver opcion por defecto.
-      return [
-        ShippingOption(
-          id: 'standard',
-          name: 'Envio estandar',
-          cost: 0,
-          estimatedDays: '3-5 dias habiles',
-        ),
-      ];
-    }
-  }
-
   /// Consulta que metodos de pago estan habilitados en el backend.
   ///
-  /// Consume `GET /api/payments/available`. Devuelve un set de strings
-  /// como {'stripe', 'mercadopago', 'spei'}.
-  Future<Set<String>> getAvailablePaymentMethods() async {
+  /// Contrato real de `GET /api/payments/available`:
+  /// `{data:{stripe:{isActive}, paypal:{isActive}, spei:{isActive}}}`.
+  ///
+  /// Ante error devuelve solo Stripe (metodo principal siempre implementado).
+  Future<PaymentMethodsAvailability> getAvailablePaymentMethods() async {
     try {
       final resp = await _dio.get(ApiEndpoints.payments.available);
       final data = resp.data;
       if (data is Map<String, dynamic>) {
         final inner = data['data'];
         final source = inner is Map<String, dynamic> ? inner : data;
-        final methods = source['methods'] as List?;
-        if (methods != null) {
-          return methods.map((e) => e.toString().toLowerCase()).toSet();
+        bool active(Object? raw) {
+          if (raw is Map) {
+            return raw['isActive'] == true || raw['active'] == true || raw['enabled'] == true;
+          }
+          return raw == true;
         }
+
+        return PaymentMethodsAvailability(
+          stripe: active(source['stripe']),
+          paypal: active(source['paypal']),
+          spei: active(source['spei']),
+        );
       }
-      return {'stripe'};
+      return const PaymentMethodsAvailability(stripe: true);
     } catch (_) {
-      return {'stripe'};
+      return const PaymentMethodsAvailability(stripe: true);
     }
   }
 }
 
-/// Opcion de envio devuelta por el backend.
-class ShippingOption {
-  const ShippingOption({
-    required this.id,
-    required this.name,
-    required this.cost,
-    required this.estimatedDays,
+/// Direccion de entrega estructurada que exigen las rutas de envio/orden.
+///
+/// Campos espejo del `shippingDetails` de la web (`services/orderService.ts`).
+class ShippingDetails {
+  const ShippingDetails({
+    required this.recipient,
+    required this.phone,
+    required this.street,
+    required this.exteriorNumber,
+    this.interiorNumber,
+    required this.neighborhood,
+    required this.city,
+    required this.state,
+    required this.postalCode,
+    this.country = 'MEX',
   });
 
-  final String id;
-  final String name;
-  final double cost;
-  final String estimatedDays;
+  final String recipient;
+  final String phone;
+  final String street;
+  final String exteriorNumber;
+  final String? interiorNumber;
+  final String neighborhood;
+  final String city;
+  final String state;
+  final String postalCode;
+  final String country;
+
+  Map<String, dynamic> toJson() => {
+        'recipient': recipient,
+        'phone': phone,
+        'street': street,
+        'exteriorNumber': exteriorNumber,
+        if (interiorNumber != null && interiorNumber!.trim().isNotEmpty)
+          'interiorNumber': interiorNumber,
+        'neighborhood': neighborhood,
+        'city': city,
+        'state': state,
+        'postalCode': postalCode,
+        'country': country,
+      };
+
+  /// STRING legible para `shippingAddress`/`billingAddress` de la orden.
+  @override
+  String toString() => [
+        recipient,
+        '$street ${exteriorNumber.trim()}${interiorNumber != null && interiorNumber!.trim().isNotEmpty ? ' Int. ${interiorNumber!.trim()}' : ''}',
+        neighborhood,
+        city,
+        state,
+        'CP $postalCode',
+        'Tel. $phone',
+      ].join(', ');
+}
+
+/// Respuesta del endpoint de cotizaciones de envio.
+class ShippingQuotesResult {
+  const ShippingQuotesResult({
+    required this.requiresSelection,
+    required this.syscomOnly,
+    required this.baseShipping,
+    required this.subtotalMxn,
+    required this.options,
+  });
+
+  final bool requiresSelection;
+  final bool syscomOnly;
+  final double baseShipping;
+  final double subtotalMxn;
+  final List<ShippingOption> options;
+}
+
+/// Opcion de envio devuelta por `POST /orders/shipping-options`.
+class ShippingOption {
+  const ShippingOption({
+    required this.quoteToken,
+    required this.carrierName,
+    this.kind,
+    this.carrierCode,
+    this.freight,
+    this.currency,
+    this.freightMxn,
+    this.shippingTotalMxn,
+  });
 
   factory ShippingOption.fromJson(Map<String, dynamic> json) {
     return ShippingOption(
-      id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Envio',
-      cost: (json['cost'] as num?)?.toDouble() ?? 0,
-      estimatedDays: json['estimatedDays']?.toString() ??
-          json['estimated_days']?.toString() ??
-          '3-5 dias habiles',
+      quoteToken: json['quoteToken']?.toString() ?? '',
+      kind: json['kind']?.toString(),
+      carrierCode: json['carrierCode']?.toString(),
+      carrierName: json['carrierName']?.toString() ??
+          json['carrier']?.toString() ??
+          'Envio',
+      freight: (json['freight'] as num?)?.toDouble(),
+      currency: json['currency']?.toString(),
+      freightMxn: (json['freightMxn'] as num?)?.toDouble(),
+      shippingTotalMxn: (json['shippingTotalMxn'] as num?)?.toDouble(),
     );
   }
+
+  /// Token que hay que devolver en `createOrder` si `requiresSelection`.
+  final String quoteToken;
+  final String? kind;
+  final String? carrierCode;
+  final String carrierName;
+  final double? freight;
+  final String? currency;
+  final double? freightMxn;
+  final double? shippingTotalMxn;
+
+  /// Etiqueta legible para la UI.
+  String get name {
+    final kindLabel = switch (kind) {
+      'syscom' => 'Syscom',
+      'propio' || 'local' => 'Pallets / shipments',
+      _ => null,
+    };
+    return kindLabel == null ? carrierName : '$carrierName ($kindLabel)';
+  }
+
+  /// Costo total de envio en MXN.
+  double get cost => shippingTotalMxn ?? freightMxn ?? freight ?? 0;
+
+  /// Texto de tiempo estimado si el backend lo llega a incluir.
+  String get estimatedDays => '';
+
+  /// True cuando es una opcion sin costo cobrado.
+  bool get isFree => cost <= 0;
 }
 
-/// Resultado de la preferencia de MercadoPago.
-class MercadoPagoResult {
-  const MercadoPagoResult({
-    required this.preferenceId,
-    required this.initPoint,
+/// Disponibilidad real de metodos de pago del backend.
+class PaymentMethodsAvailability {
+  const PaymentMethodsAvailability({
+    this.stripe = false,
+    this.paypal = false,
+    this.spei = false,
   });
 
-  final String preferenceId;
-  final String initPoint;
-
-  bool get isValid => initPoint.isNotEmpty;
-}
-
-/// Resultado del pago SPEI.
-class SpeiResult {
-  const SpeiResult({
-    required this.clabe,
-    required this.bank,
-    required this.reference,
-    required this.amount,
-    required this.concept,
-  });
-
-  final String clabe;
-  final String bank;
-  final String reference;
-  final double amount;
-  final String concept;
-
-  bool get isValid => clabe.isNotEmpty;
+  final bool stripe;
+  final bool paypal;
+  final bool spei;
 }
 
 /// Provider del repositorio de checkout.

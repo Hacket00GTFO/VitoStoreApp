@@ -26,11 +26,12 @@ final relatedProductsProvider =
     return <Product>[];
   }
   try {
-    final list = await ref.read(productRepositoryProvider).list(
-          category: product.categoryName ?? product.categoryId,
+    final (:products, :total) = await ref.read(productRepositoryProvider).list(
+          categoryId: product.categoryId,
+          category: product.categoryName,
           limit: 6,
         );
-    return list.where((p) => p.id != product.id).toList();
+    return products.where((p) => p.id != product.id).toList();
   } catch (_) {
     return <Product>[];
   }

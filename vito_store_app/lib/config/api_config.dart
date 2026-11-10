@@ -95,6 +95,9 @@ class ApiEndpoints {
   static String get chatbot => '$base/chatbot';
   static String get chatbotAssistantQuery => '$base/chatbot/assistant/public-query';
   static String get chatbotAssistantReset => '$base/chatbot/assistant/reset';
+  // Variantes anónimas para la app móvil (sin sesión; tope por IP).
+  static String get chatbotAssistantAppQuery => '$base/chatbot/assistant/app-query';
+  static String get chatbotAssistantAppReset => '$base/chatbot/assistant/app-reset';
 
   // --- Cotizaciones especializadas ---
   static String get specializedQuotes => '$base/specialized-quotes';
@@ -104,6 +107,9 @@ class ApiEndpoints {
 
   // --- Perfil / Historial ---
   static String get profile => '$base/account/me';
+  /// Datos de contacto para prefilar formularios (`GET /profile/service-request-data`,
+  /// ruta real en `profileRoutes.ts`; `/account/me/service-request-data` NO existe).
+  static String get profileServiceRequestData => '$base/profile/service-request-data';
   static String get history => '$base/history';
 }
 

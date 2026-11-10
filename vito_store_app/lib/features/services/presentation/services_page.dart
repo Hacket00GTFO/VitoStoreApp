@@ -79,8 +79,14 @@ class _ServiceCard extends StatelessWidget {
   final IconData icon;
 
   void _solicitar(BuildContext context) {
-    final subject = 'Solicitud de servicio: ${service.name}';
-    context.push('/contacto?subject=${Uri.encodeQueryComponent(subject)}');
+    // Fase 2.2: en vez del formulario de contacto, abre el formulario de
+    // cotizacion especializada (`POST /specialized-quotes`). Los Service de la
+    // BD son genericos (soporte/mantenimiento), asi que el tipo por defecto es
+    // SOPORTE; el usuario puede cambiarlo en el formulario.
+    context.push(
+      '/cotizador?serviceType=SOPORTE'
+      '&serviceName=${Uri.encodeQueryComponent(service.name)}',
+    );
   }
 
   @override

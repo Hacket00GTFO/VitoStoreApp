@@ -9,10 +9,10 @@ import '../domain/chat_message.dart';
 
 /// Servicio del chatbot "Asistente VITO".
 ///
-/// Consume el endpoint REST del backend (el mismo que usa el widget web):
-/// `POST /api/chatbot/assistant/public-query` (requiere sesión activa).
-/// Mantiene un `sessionId` estable mientras la app está viva para darle
-/// contexto conversacional al asistente.
+/// Consume las variantes anónimas del backend para la app móvil:
+/// `POST /api/chatbot/assistant/app-query` (sin sesión activa; tope por IP
+/// en el backend). Mantiene un `sessionId` estable mientras la app está
+/// viva para darle contexto conversacional al asistente.
 class ChatbotService {
   ChatbotService(this._dio);
 
@@ -52,7 +52,7 @@ class ChatbotService {
         .toList();
 
     final resp = await _dio.post(
-      ApiEndpoints.chatbotAssistantQuery,
+      ApiEndpoints.chatbotAssistantAppQuery,
       data: {
         'message': message,
         'explicitMessage': message,
@@ -61,7 +61,7 @@ class ChatbotService {
         'pageContext': '/app',
         'history': historyPayload,
       },
-    );
+    ).timeout(const Duration(seconds: 30));
 
     final data = resp.data;
     final payload = data is Map<String, dynamic>
@@ -84,7 +84,8 @@ class ChatbotService {
     if (previous == null) return;
     try {
       await _dio
-          .post(ApiEndpoints.chatbotAssistantReset, data: {'sessionId': previous})
+          .post(ApiEndpoints.chatbotAssistantAppReset,
+              data: {'sessionId': previous})
           .timeout(const Duration(seconds: 4));
     } catch (_) {
       // Best-effort: no bloquear la UI si falla el reset.

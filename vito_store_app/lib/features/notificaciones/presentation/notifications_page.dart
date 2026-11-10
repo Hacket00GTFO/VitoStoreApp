@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../shared/widgets/state_view.dart';
 import '../data/notification_repository.dart';
 import '../domain/notification_model.dart';
-
 /// Provider que obtiene la lista de notificaciones.
 final notificationsProvider =
     FutureProvider.autoDispose<List<AppNotification>>((ref) async {
@@ -27,6 +26,12 @@ class NotificationsPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Notificaciones'),
         actions: [
+          if (asyncNotifications.value?.any((n) => !n.read) ?? false)
+            IconButton(
+              icon: const Icon(LucideIcons.checkCheck),
+              tooltip: 'Marcar todas como leidas',
+              onPressed: () => _markAllRead(context, ref),
+            ),
           IconButton(
             icon: const Icon(LucideIcons.refreshCw),
             tooltip: 'Recargar',
@@ -68,12 +73,27 @@ class NotificationsPage extends ConsumerWidget {
 
     try {
       await ref.read(notificationRepositoryProvider).markAsRead(notification.id);
-      // Refrescar la lista para reflejar el cambio.
+      // Refrescar la lista y el badge del shell.
       ref.invalidate(notificationsProvider);
+      ref.read(unreadCountProvider.notifier).recount();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al marcar: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(notificationRepositoryProvider).markAllRead();
+      ref.invalidate(notificationsProvider);
+      ref.read(unreadCountProvider.notifier).recount();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al marcar todas: $e')),
         );
       }
     }

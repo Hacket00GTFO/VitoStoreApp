@@ -10,11 +10,14 @@ import '../features/auth/presentation/register_page.dart';
 import '../features/auth/presentation/reset_password_page.dart';
 import '../features/auth/presentation/verify_account_page.dart';
 import '../features/blog/presentation/blog_page.dart';
+import '../features/blog/presentation/blog_post_page.dart';
 import '../features/cart/presentation/cart_page.dart';
 import '../features/checkout/presentation/checkout_page.dart';
 import '../features/contact/presentation/contact_page.dart';
+import '../features/cotizaciones/presentation/quote_form_page.dart';
 import '../features/favorites/presentation/favorites_page.dart';
 import '../features/home/presentation/home_page.dart';
+import '../features/maintenance/data/maintenance_status.dart';
 import '../features/maintenance/presentation/maintenance_page.dart';
 import '../features/notificaciones/presentation/notifications_page.dart';
 import '../features/products/presentation/product_detail_page.dart';
@@ -31,6 +34,8 @@ import '../shared/layouts/main_shell.dart';
 /// - Guards: redirige a /login si requiere auth y no está autenticado.
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
+  // Estado de mantenimiento: el redirect global reacciona a su refresco.
+  final maintenance = ref.watch(maintenanceStatusProvider).value;
 
   return GoRouter(
     initialLocation: '/',
@@ -55,6 +60,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Si está cargando la sesión inicial, no redirigir aún.
       if (isLoading) return null;
+
+      // Modo mantenimiento: redirigir todo (excepto la propia pantalla) a
+      // /maintenance; al salir del modo, el refresco del provider regresa.
+      if (maintenance != null && maintenance.blocksStore && path != '/maintenance') {
+        return '/maintenance';
+      }
+      if (maintenance != null && !maintenance.blocksStore && path == '/maintenance') {
+        return '/';
+      }
 
       if (requiresAuth && !isAuthenticated) {
         // Guardar destino para redirigir tras login.
@@ -116,10 +130,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/servicios', builder: (context, state) => const ServicesPage()),
+      // Formulario de cotizacion especializada (Fase 2.2). Sin auth guard: si
+      // hay sesion envia a POST /specialized-quotes y si no, al fallback
+      // publico /specialized-quotes/public (el prefill usa datos disponibles).
+      GoRoute(
+        path: '/cotizador',
+        builder: (context, state) => QuoteFormPage(
+          initialServiceType: state.uri.queryParameters['serviceType'],
+          initialServiceName: state.uri.queryParameters['serviceName'],
+        ),
+      ),
       GoRoute(path: '/carrito', builder: (context, state) => const CartPage()),
       GoRoute(path: '/checkout', builder: (context, state) => const CheckoutPage()),
       GoRoute(path: '/checkout/success', builder: (context, state) => const CheckoutPage(success: true)),
       GoRoute(path: '/blog', builder: (context, state) => const BlogPage()),
+      // Detalle por slug: entrada para deep links (vitoapp:///blog/<slug>).
+      GoRoute(
+        path: '/blog/:slug',
+        builder: (context, state) =>
+            BlogPostBySlugPage(slug: state.pathParameters['slug'] ?? ''),
+      ),
       GoRoute(
         path: '/contacto',
         builder: (context, state) => ContactPage(

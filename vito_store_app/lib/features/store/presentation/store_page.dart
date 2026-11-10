@@ -199,11 +199,11 @@ class _StoreGridState extends ConsumerState<_StoreGrid> {
 class _StoreFiltersSheet extends ConsumerWidget {
   const _StoreFiltersSheet();
 
+  // Valores validos del backend: PRODUCT_SORTS = ['name','price-asc','price-desc'].
   static const _sortOptions = <(String, String)>[
-    ('recent', 'Mas recientes'),
+    ('name', 'Nombre: A-Z'),
     ('price-asc', 'Precio: menor a mayor'),
     ('price-desc', 'Precio: mayor a menor'),
-    ('name-asc', 'Nombre: A-Z'),
   ];
 
   @override

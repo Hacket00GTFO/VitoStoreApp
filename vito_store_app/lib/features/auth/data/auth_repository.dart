@@ -22,8 +22,12 @@ class AuthRepository {
       if (captchaToken != null) 'captchaToken': captchaToken,
     });
     final data = resp.data as Map<String, dynamic>;
-    // Si el backend indica que requiere codigo 2FA.
-    if (data['requiresCode'] == true || data['verificationRequired'] == true) {
+    // Si el backend indica que requiere codigo 2FA. El backend real responde
+    // 202 con `requiresLoginCode` para todo rol USER (codigo por email);
+    // los otros dos nombres quedan por retrocompatibilidad.
+    if (data['requiresLoginCode'] == true ||
+        data['requiresCode'] == true ||
+        data['verificationRequired'] == true) {
       return LoginResult(requiresCode: true, email: email);
     }
     final user = User.fromJson(data['user'] as Map<String, dynamic>);
@@ -51,6 +55,11 @@ class AuthRepository {
     );
   }
 
+  /// Reenvia el codigo 2FA del login (`POST /account/login-resend`).
+  Future<void> resendLoginCode(String email) async {
+    await _dio.post(ApiEndpoints.auth.loginResend, data: {'email': email});
+  }
+
   Future<void> register({
     required String email,
     required String password,
@@ -67,8 +76,22 @@ class AuthRepository {
     });
   }
 
-  Future<void> verifyEmail({required String email, required String code}) async {
-    await _dio.post(ApiEndpoints.auth.verifyEmail, data: {'email': email, 'code': code});
+  /// Verifica el email tras el registro.
+  ///
+  /// El backend responde `200 {user, tokens}`: usamos los tokens para dejar la
+  /// sesión iniciada sin obligar a un segundo login.
+  Future<LoginResult> verifyEmail({required String email, required String code}) async {
+    final resp =
+        await _dio.post(ApiEndpoints.auth.verifyEmail, data: {'email': email, 'code': code});
+    final data = resp.data;
+    if (data is! Map<String, dynamic>) return LoginResult();
+    final tokens = data['tokens'] as Map<String, dynamic>?;
+    final userJson = data['user'];
+    return LoginResult(
+      user: userJson is Map<String, dynamic> ? User.fromJson(userJson) : null,
+      accessToken: tokens?['accessToken'] as String?,
+      refreshToken: tokens?['refreshToken'] as String?,
+    );
   }
 
   Future<void> resendVerification(String email) async {

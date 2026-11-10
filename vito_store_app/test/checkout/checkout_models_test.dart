@@ -4,119 +4,161 @@ import 'package:vito_store_app/features/checkout/data/checkout_repository.dart';
 
 void main() {
   group('ShippingOption.fromJson', () {
-    test('creates a valid ShippingOption from a complete JSON map', () {
+    test('crea una opcion completa desde el JSON del backend', () {
       final json = {
-        'id': 'express',
-        'name': 'Envio express',
-        'cost': 149.50,
-        'estimatedDays': '1-2 dias habiles',
+        'quoteToken': 'tok_abc123',
+        'kind': 'syscom',
+        'carrierCode': 'FEDEX',
+        'carrierName': 'FedEx',
+        'freight': 149.50,
+        'currency': 'MXN',
+        'freightMxn': 149.50,
+        'shippingTotalMxn': 149.50,
       };
 
       final option = ShippingOption.fromJson(json);
 
-      expect(option.id, 'express');
-      expect(option.name, 'Envio express');
+      expect(option.quoteToken, 'tok_abc123');
+      expect(option.kind, 'syscom');
+      expect(option.carrierCode, 'FEDEX');
+      expect(option.carrierName, 'FedEx');
+      expect(option.shippingTotalMxn, 149.50);
+      // name agrega la etiqueta del kind.
+      expect(option.name, 'FedEx (Syscom)');
+      // cost usa shippingTotalMxn → freightMxn → freight → 0 en ese orden.
       expect(option.cost, 149.50);
-      expect(option.estimatedDays, '1-2 dias habiles');
+      expect(option.isFree, isFalse);
     });
 
-    test('handles missing fields with defaults', () {
+    test('usa defaults cuando faltan campos', () {
       final option = ShippingOption.fromJson({});
 
-      expect(option.id, '');
+      expect(option.quoteToken, '');
       expect(option.name, 'Envio');
       expect(option.cost, 0);
-      expect(option.estimatedDays, '3-5 dias habiles');
+      expect(option.isFree, isTrue);
     });
 
-    test('falls back to estimated_days snake_case', () {
-      final option = ShippingOption.fromJson({
-        'id': 'standard',
-        'name': 'Estandar',
-        'estimated_days': '5-7 dias',
-      });
+    test('carrier fallback desde `carrier` snake/alias', () {
+      final option = ShippingOption.fromJson({'carrier': 'Estafeta'});
 
-      expect(option.estimatedDays, '5-7 dias');
+      expect(option.carrierName, 'Estafeta');
     });
 
-    test('uses default estimatedDays when both camelCase and snake_case missing', () {
+    test('kind propio/local se etiqueta como Pallets / shipments', () {
       final option = ShippingOption.fromJson({
-        'id': 'standard',
-        'name': 'Estandar',
+        'carrierName': 'Vito',
+        'kind': 'propio',
       });
 
-      expect(option.estimatedDays, '3-5 dias habiles');
+      expect(option.name, 'Vito (Pallets / shipments)');
     });
 
-    test('coerces numeric id to string', () {
-      final option = ShippingOption.fromJson({
-        'id': 10,
-        'name': 'X',
-        'cost': 0,
-      });
+    test('coerce de freight numérico a double dé problema', () {
+      final option = ShippingOption.fromJson({'freightMxn': 55});
 
-      expect(option.id, '10');
+      expect(option.freightMxn, 55.0);
+      expect(option.cost, 55.0);
+    });
+
+    test('estimatedDays ya no viene del backend (contrato real)', () {
+      final option = ShippingOption.fromJson({'quoteToken': 't'});
+
+      expect(option.estimatedDays, '');
     });
   });
 
-  group('MercadoPagoResult.isValid', () {
-    test('returns true when initPoint is non-empty', () {
-      const result = MercadoPagoResult(
-        preferenceId: 'pref-123',
-        initPoint: 'https://mp.com/checkout/abc',
+  group('ShippingDetails', () {
+    test('toJson emite los 9 campos del contrato del backend', () {
+      const details = ShippingDetails(
+        recipient: 'Cliente',
+        phone: '5512345678',
+        street: 'Reforma',
+        exteriorNumber: '12',
+        neighborhood: 'Centro',
+        city: 'CDMX',
+        state: 'CMX',
+        postalCode: '06000',
       );
 
-      expect(result.isValid, isTrue);
+      final json = details.toJson();
+
+      expect(json, {
+        'recipient': 'Cliente',
+        'phone': '5512345678',
+        'street': 'Reforma',
+        'exteriorNumber': '12',
+        'neighborhood': 'Centro',
+        'city': 'CDMX',
+        'state': 'CMX',
+        'postalCode': '06000',
+        'country': 'MEX', // default: el backend valida toUpperCase()=='MEX'
+      });
     });
 
-    test('returns false when initPoint is empty', () {
-      const result = MercadoPagoResult(preferenceId: 'pref-123', initPoint: '');
+    test('intentalNumber vacio se omite del JSON', () {
+      const details = ShippingDetails(
+        recipient: 'C',
+        phone: '5512345678',
+        street: 'S',
+        exteriorNumber: '1',
+        interiorNumber: '',
+        neighborhood: 'N',
+        city: 'C',
+        state: 'S',
+        postalCode: '01000',
+      );
 
-      expect(result.isValid, isFalse);
+      expect(details.toJson().containsKey('interiorNumber'), isFalse);
     });
 
-    test('returns false when both fields are empty', () {
-      const result = MercadoPagoResult(preferenceId: '', initPoint: '');
+    test('toString produce el shippingAddress legible de la orden', () {
+      const details = ShippingDetails(
+        recipient: 'Cliente',
+        phone: '5512345678',
+        street: 'Reforma',
+        exteriorNumber: '12',
+        neighborhood: 'Centro',
+        city: 'CDMX',
+        state: 'CMX',
+        postalCode: '06000',
+      );
 
-      expect(result.isValid, isFalse);
+      expect(details.toString(),
+          'Cliente, Reforma 12, Centro, CDMX, CMX, CP 06000, Tel. 5512345678');
     });
   });
 
-  group('SpeiResult.isValid', () {
-    test('returns true when clabe is non-empty', () {
-      const result = SpeiResult(
-        clabe: '012180012345678901',
-        bank: 'STP',
-        reference: 'REF-001',
-        amount: 1500.0,
-        concept: 'Pago orden 1',
+  group('ShippingQuotesResult', () {
+    test('expone requiresSelection y opciones', () {
+      const result = ShippingQuotesResult(
+        requiresSelection: true,
+        syscomOnly: false,
+        baseShipping: 20,
+        subtotalMxn: 1000,
+        options: [ShippingOption(quoteToken: 't1', carrierName: 'FedEx')],
       );
 
-      expect(result.isValid, isTrue);
+      expect(result.requiresSelection, isTrue);
+      expect(result.options.single.quoteToken, 't1');
+    });
+  });
+
+  group('PaymentMethodsAvailability', () {
+    test('defaults desactivados', () {
+      const avail = PaymentMethodsAvailability();
+
+      expect(avail.stripe, isFalse);
+      expect(avail.paypal, isFalse);
+      expect(avail.spei, isFalse);
     });
 
-    test('returns false when clabe is empty', () {
-      const result = SpeiResult(
-        clabe: '',
-        bank: 'STP',
-        reference: 'REF-001',
-        amount: 1500.0,
-        concept: 'Pago orden 1',
-      );
+    test('constructor const', () {
+      const avail = PaymentMethodsAvailability(stripe: true, spei: true);
 
-      expect(result.isValid, isFalse);
-    });
-
-    test('returns false when all fields are empty/zero', () {
-      const result = SpeiResult(
-        clabe: '',
-        bank: '',
-        reference: '',
-        amount: 0,
-        concept: '',
-      );
-
-      expect(result.isValid, isFalse);
+      expect(avail.stripe, isTrue);
+      expect(avail.spei, isTrue);
+      expect(avail.paypal, isFalse);
     });
   });
 }
